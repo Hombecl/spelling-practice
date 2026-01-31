@@ -33,7 +33,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
   const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'tesseract' | null>(null);
   const [rawOutput, setRawOutput] = useState<string>(''); // Debug: show Gemini raw output
-  const [showDebug, setShowDebug] = useState(false);
+  const [showDebug, setShowDebug] = useState(true); // Default open for debugging
 
   const MAX_IMAGES = 3;
 
@@ -603,6 +603,23 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 )}
               </div>
 
+              {/* Debug: Show raw Gemini output - FIRST for visibility */}
+              {rawOutput && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-300 rounded-xl">
+                  <button
+                    onClick={() => setShowDebug(!showDebug)}
+                    className="text-sm text-purple-700 font-bold flex items-center gap-2"
+                  >
+                    🔍 {showDebug ? '收起' : '展開'} AI 原始輸出
+                  </button>
+                  {showDebug && (
+                    <div className="mt-2 p-2 bg-white rounded text-xs font-mono whitespace-pre-wrap max-h-60 overflow-y-auto border">
+                      {rawOutput || '(無輸出)'}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Highlight Detection Notice */}
               {highlightedWords.size > 0 && (
                 <div className="mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-xl">
@@ -706,22 +723,6 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 )}
               </div>
 
-              {/* Debug: Show raw Gemini output */}
-              {rawOutput && (
-                <div className="mt-4 border-t pt-4">
-                  <button
-                    onClick={() => setShowDebug(!showDebug)}
-                    className="text-xs text-blue-500 hover:text-blue-700 underline"
-                  >
-                    {showDebug ? '隱藏' : '顯示'} AI 原始輸出 (Debug)
-                  </button>
-                  {showDebug && (
-                    <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
-                      {rawOutput}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
