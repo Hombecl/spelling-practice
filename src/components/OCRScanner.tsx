@@ -32,6 +32,8 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [error, setError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
   const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'tesseract' | null>(null);
+  const [rawOutput, setRawOutput] = useState<string>(''); // Debug: show Gemini raw output
+  const [showDebug, setShowDebug] = useState(false);
 
   const MAX_IMAGES = 3;
 
@@ -98,6 +100,11 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
       );
 
       if (result.success) {
+        // Store raw output for debugging
+        if (result.rawText) {
+          setRawOutput(prev => prev ? prev + '\n\n---IMAGE---\n\n' + result.rawText : result.rawText);
+        }
+
         // Filter to valid words and add to collection (avoid duplicates)
         const validWords = result.words.filter(isValidEnglishWord);
         const validHighlighted = result.highlightedWords.filter(isValidEnglishWord);
@@ -124,6 +131,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
       setExtractedWords(allWords);
       setHighlightedWords(new Set(allHighlightedWords));
       setOcrSource(lastSource);
+      setRawOutput(prev => prev); // Keep raw output
 
       // If highlighted words found, select only those by default
       if (allHighlightedWords.length > 0) {
@@ -199,6 +207,8 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     setAnyColor(false);
     setSelectedColors(new Set(['yellow']));
     setProcessingStatus('');
+    setRawOutput('');
+    setShowDebug(false);
   };
 
   const toggleColor = (color: HighlightColor) => {
@@ -695,6 +705,23 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                   </p>
                 )}
               </div>
+
+              {/* Debug: Show raw Gemini output */}
+              {rawOutput && (
+                <div className="mt-4 border-t pt-4">
+                  <button
+                    onClick={() => setShowDebug(!showDebug)}
+                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                  >
+                    {showDebug ? '隱藏' : '顯示'} AI 原始輸出 (Debug)
+                  </button>
+                  {showDebug && (
+                    <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      {rawOutput}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
