@@ -457,14 +457,35 @@ function extractEnglishWords(text: string): string[] {
 
 // Validate if a string looks like a valid English word
 export function isValidEnglishWord(word: string): boolean {
-  // Must be at least 2 characters
-  if (word.length < 2) return false;
+  // Must be at least 3 characters (skip 2-letter words like "ey")
+  if (word.length < 3) return false;
 
   // Must only contain letters
   if (!/^[a-zA-Z]+$/.test(word)) return false;
 
-  // Must have at least one vowel (basic check)
-  if (!/[aeiouAEIOU]/.test(word)) return false;
+  // Must have at least one vowel
+  if (!/[aeiou]/i.test(word)) return false;
+
+  // Skip words that are just vowels or consonants repeated (like "aaa")
+  if (/^(.)\1+$/.test(word)) return false;
+
+  // Skip words with too many consecutive consonants (likely OCR errors)
+  if (/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(word)) return false;
+
+  // Skip words with too many consecutive vowels (likely OCR errors)
+  if (/[aeiou]{4,}/i.test(word)) return false;
+
+  // Common OCR garbage patterns to skip
+  const garbagePatterns = [
+    /^[aeiou]{2,3}$/i,  // Just 2-3 vowels like "ey", "oa", "ia"
+    /^[bcdfghjklmnpqrstvwxyz]{2,3}$/i,  // Just 2-3 consonants
+    /^.{1,2}$/,  // 1-2 character "words"
+    /^[aeiou]+[bcdfghjklmnpqrstvwxyz]$/i,  // Vowels + single consonant like "oria" -> no wait, this is too strict
+  ];
+
+  // Only check the simple garbage patterns
+  if (/^[aeiou]{2,3}$/i.test(word)) return false;  // Just vowels like "ey", "oa"
+  if (/^[bcdfghjklmnpqrstvwxyz]{2,3}$/i.test(word)) return false;  // Just consonants
 
   return true;
 }

@@ -31,22 +31,25 @@ function buildPrompt(mode: string, highlightColors?: string[]): string {
 
     return `You are an OCR assistant for a children's spelling practice app. The user has marked specific words with ${colorText} HIGHLIGHTER PEN.
 
-YOUR TASK: Extract ONLY the words that are highlighted with ${colorText} highlighter.
+YOUR TASK: Extract ONLY the REAL ENGLISH WORDS that are highlighted with ${colorText} highlighter.
 
 CRITICAL INSTRUCTIONS:
 1. ONLY extract words that have ${colorText} highlighter marking on them
-2. Ignore ALL words that are NOT highlighted
-3. List each highlighted word on its own line, wrapped with ** like **word**
-4. If a word is partially highlighted, include it
-5. Ignore Chinese characters, numbers, and punctuation
-6. Keep original spelling (don't correct typos)
+2. ONLY include words that are REAL English words (exist in a dictionary)
+3. DO NOT include OCR artifacts, random letter combinations, or word fragments
+4. Ignore ALL words that are NOT highlighted
+5. List each highlighted word on its own line, wrapped with ** like **word**
+6. If a word is partially highlighted but is a real English word, include it
+7. Ignore Chinese characters, numbers, and punctuation
 
 WHAT TO LOOK FOR:
 - Words with bright ${colorText} background/overlay (semi-transparent highlighter color)
 - Text that appears to have highlighter pen marking over it
 - The highlighter color should be clearly visible on or around the text
 
-Example output format (only highlighted words):
+IMPORTANT: Every word you output must be a REAL English word. Skip any OCR garbage.
+
+Example output format (only highlighted REAL words):
 **apple**
 **beautiful**
 **family**
@@ -58,26 +61,30 @@ Now extract ONLY the ${colorText} highlighted words from this image:`;
   }
 
   // Smart mode - AI picks suitable spelling words
-  return `You are an OCR assistant for a children's spelling practice app. Extract English vocabulary words that are suitable for PRIMARY SCHOOL students to practice spelling.
+  return `You are an OCR assistant for a children's spelling practice app. Extract REAL English vocabulary words that are suitable for PRIMARY SCHOOL students to practice spelling.
 
-YOUR TASK: Identify and extract words that are good for spelling practice.
+YOUR TASK: Identify and extract REAL ENGLISH WORDS that are good for spelling practice.
 
 CRITICAL INSTRUCTIONS:
-1. Extract meaningful vocabulary words (nouns, verbs, adjectives, adverbs)
-2. SKIP these types of words:
+1. ONLY extract words that exist in an English dictionary
+2. DO NOT include:
+   - Random letter combinations or OCR artifacts (like "ey", "oria", "tbe", "wben")
+   - Partial words or word fragments
+   - Misspellings that aren't real words
    - Common function words: the, a, an, is, are, was, were, be, been, to, of, in, for, on, with, at, by, from
    - Pronouns: I, you, he, she, it, we, they, my, your, his, her, our, their
-   - Simple conjunctions: and, or, but, if, so, as
    - Very short words (2 letters or less)
-3. INCLUDE these types of words:
-   - Nouns: girl, boy, family, school, teacher, beautiful, garden
+3. INCLUDE these types of REAL words:
+   - Nouns: girl, boy, family, school, teacher, garden, animal
    - Verbs: running, swimming, playing, eating, walking
    - Adjectives: happy, beautiful, wonderful, important, different
    - Adverbs: quickly, slowly, carefully, happily
-4. Mark words that seem to be KEY VOCABULARY (larger font, bold, or in vocabulary lists) with ** like **word**
+4. Mark KEY VOCABULARY words with ** like **word**
 5. Ignore Chinese characters, numbers, and punctuation
-6. Keep original spelling (don't correct typos)
-7. Aim for 10-30 words maximum - focus on quality vocabulary
+6. If a word looks like OCR garbage (random letters), DO NOT include it
+7. Aim for 10-30 quality words maximum
+
+IMPORTANT: Every word you output must be a REAL English word that a child could look up in a dictionary.
 
 Example output format:
 **beautiful**
