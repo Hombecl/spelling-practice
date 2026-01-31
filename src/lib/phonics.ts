@@ -1,5 +1,7 @@
 // Phonics breakdown utilities for English words
 
+import { speak } from './speech';
+
 export interface PhonicsBreakdown {
   word: string;
   syllables: string[];
@@ -29,9 +31,12 @@ const SUFFIXES = [
   'er', 'est',
   // Plural forms (important for words like fairies, babies, etc.)
   'ies', 'ves',
+  // Consonant-le syllables (Final Stable Syllables)
+  // These MUST be kept together as they make the schwa-l sound /əl/
+  'tle', 'ble', 'dle', 'fle', 'gle', 'kle', 'ple', 'zle', 'cle', 'sle', 'stle',
   // Other common endings
   'ure', 'ture', 'sure', 'ance', 'ence',
-  'ry', 'ary', 'ory', 'ery',
+  'ry', 'ary', 'ory', 'ery', 'age',
   'en', 'ern', 'ling', 'let', 'ette',
   'ward', 'wise',
 ];
@@ -378,86 +383,115 @@ export async function speakPhonics(word: string, onSound?: (index: number) => vo
   for (let i = 0; i < sounds.length; i++) {
     if (onSound) onSound(i);
 
-    await new Promise<void>((resolve) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) {
-        setTimeout(resolve, 500);
-        return;
-      }
+    // Use the centralized speak function
+    await speak(sounds[i], 0.5);
 
-      const utterance = new SpeechSynthesisUtterance(sounds[i]);
-      utterance.rate = 0.5;
-      utterance.pitch = 1;
-      utterance.lang = 'en-US';
-
-      utterance.onend = () => {
-        setTimeout(resolve, 300);
-      };
-      utterance.onerror = () => resolve();
-
-      window.speechSynthesis.speak(utterance);
-    });
+    // Pause between sounds
+    await new Promise(resolve => setTimeout(resolve, 200));
   }
 }
 
 // Pronunciation hints for syllables that TTS might mispronounce
 // Maps written syllables to phonetic spellings that TTS can read correctly
+// For Hong Kong ESL learners - optimized for clear syllable sounds
 const SYLLABLE_PRONUNCIATION: Record<string, string> = {
-  // Plural/verb suffixes
-  'ies': 'eez',      // fairies → fair-eez
-  'ves': 'vz',       // leaves → lea-vz
-  'es': 'iz',        // boxes → box-iz
-  's': 'ss',         // cats → cat-ss (prevent spelling)
+  // ========== CONSONANT-LE SYLLABLES (Final Stable Syllables) ==========
+  // These are CRITICAL - the 'e' is silent, pronunciation is consonant + "ul" (schwa-l)
+  // Reference: https://blog.maketaketeach.com/teaching-the-consonantle-syllable-pattern/
+  'tle': 'tul',      // little → lit-tul, bottle → bot-tul
+  'ble': 'bul',      // table → ta-bul, bubble → bub-bul
+  'dle': 'dul',      // middle → mid-dul, puddle → pud-dul
+  'fle': 'ful',      // waffle → waf-ful, rifle → ri-ful
+  'gle': 'gul',      // giggle → gig-gul, eagle → ee-gul
+  'kle': 'kul',      // sparkle → spar-kul, pickle → pic-kul
+  'ple': 'pul',      // apple → ap-pul, simple → sim-pul
+  'zle': 'zul',      // puzzle → puz-zul, drizzle → driz-zul
+  'cle': 'kul',      // circle → sir-kul, bicycle → bi-si-kul
+  'sle': 'sul',      // castle → cas-sul (t is silent)
+  'stle': 'sul',     // whistle → whis-sul, castle → cas-sul (t is silent)
 
-  // Common suffixes that TTS struggles with
-  'tion': 'shun',    // nation → na-shun
-  'sion': 'zhun',    // vision → vi-zhun
+  // ========== PLURAL/VERB SUFFIXES ==========
+  'ies': 'eez',      // fairies → fair-eez, babies → ba-beez
+  'ries': 'reez',    // fairies split as fair-ries → "reez"
+  'ves': 'vz',       // leaves → leevz
+  'es': 'iz',        // boxes → box-iz, watches → watch-iz
+  'ied': 'eed',      // carried → car-eed
+  'ying': 'ee-ing',  // carrying → car-ee-ing
+
+  // ========== COMMON SUFFIXES ==========
+  'tion': 'shun',    // nation → na-shun, station → sta-shun
+  'sion': 'zhun',    // vision → vi-zhun, television → tele-vi-zhun
+  'cian': 'shun',    // musician → mu-zi-shun
+  'tian': 'shun',    // martian → mar-shun
   'ious': 'ee-us',   // curious → cur-ee-us
-  'eous': 'ee-us',   // gorgeous → gorg-ee-us
-  'ous': 'us',       // famous → fam-us
-  'ness': 'niss',    // happiness → happi-niss
-  'ment': 'ment',    // treatment (usually ok)
-  'ful': 'full',     // beautiful → beauti-full
+  'eous': 'ee-us',   // gorgeous → gor-jus
+  'ous': 'us',       // famous → fay-mus
+  'ness': 'niss',    // happiness → hap-ee-niss
+  'ment': 'ment',    // treatment → treet-ment
+  'ful': 'full',     // beautiful → byoo-ti-full
   'less': 'liss',    // hopeless → hope-liss
-  'able': 'uh-bull', // capable → cap-uh-bull
-  'ible': 'ih-bull', // possible → poss-ih-bull
-  'ing': 'ing',      // singing (usually ok)
-  'ed': 'ed',        // wanted (usually ok)
-  'er': 'er',        // teacher (usually ok)
-  'est': 'ist',      // biggest → bigg-ist
-  'ly': 'lee',       // quickly → quick-lee
-  'ty': 'tee',       // beauty → beau-tee
-  'ity': 'ih-tee',   // city → cih-tee
-  'al': 'ul',        // animal → anim-ul
-  'ial': 'ee-ul',    // special → spesh-ee-ul
-  'ic': 'ick',       // magic → mag-ick
-  'ical': 'ih-kul',  // magical → mag-ih-kul
-  'ant': 'ant',      // elephant (usually ok)
-  'ent': 'ent',      // student (usually ok)
-  'ance': 'unce',    // dance (usually ok)
-  'ence': 'ence',    // fence (usually ok)
+  'able': 'uh-bul',  // capable → kay-puh-bul
+  'ible': 'ih-bul',  // possible → poss-ih-bul
+  'ing': 'ing',      // singing → sing-ing
+  'ed': 'ed',        // wanted → won-ted
+  'er': 'er',        // teacher → tee-cher
+  'est': 'ist',      // biggest → big-ist
+  'ly': 'lee',       // quickly → kwik-lee
+  'ty': 'tee',       // beauty → byoo-tee
+  'ity': 'ih-tee',   // city → sih-tee
+  'al': 'ul',        // animal → an-ih-mul
+  'ial': 'ee-ul',    // special → spesh-ul
+  'ic': 'ick',       // magic → maj-ick
+  'ical': 'ih-kul',  // magical → maj-ih-kul
+  'ant': 'unt',      // elephant → el-eh-funt
+  'ent': 'unt',      // student → stoo-dunt
+  'ance': 'unce',    // dance → dance
+  'ence': 'unce',    // fence → fence
   'ure': 'yer',      //ature → na-yer
   'ture': 'cher',    // nature → na-cher
-  'sure': 'zher',    // measure → mea-zher
+  'sure': 'zher',    // measure → meh-zher
+  'age': 'ij',       // village → vil-ij
+  'ive': 'iv',       // active → ak-tiv
+  'ary': 'air-ee',   // library → li-brair-ee
+  'ory': 'or-ee',    // story → stor-ee
+  'ery': 'er-ee',    // every → ev-er-ee
 
-  // Prefixes
-  'un': 'un',        // (usually ok)
+  // ========== PREFIXES ==========
+  'un': 'un',        // unhappy → un-hap-ee
   're': 'ree',       // redo → ree-do
-  'pre': 'pree',     // preview → pree-view
-  'dis': 'diss',     // disagree → diss-agree
+  'pre': 'pree',     // preview → pree-vyoo
+  'dis': 'diss',     // disagree → diss-uh-gree
   'mis': 'miss',     // mistake → miss-take
-  'non': 'non',      // (usually ok)
-  'over': 'oh-ver',  // overcome → oh-ver-come
-  'under': 'un-der', // (usually ok)
+  'non': 'non',      // nonstop → non-stop
+  'over': 'oh-ver',  // overcome → oh-ver-cum
+  'under': 'un-der', // understand → un-der-stand
 
-  // Short syllables that might be spelled out
+  // ========== SHORT SYLLABLES (prevent TTS from spelling out) ==========
+  // Add vowel sound to make them pronounceable
   'th': 'thuh',
   'ch': 'chuh',
   'sh': 'shuh',
   'wh': 'wuh',
   'ph': 'fuh',
+  'gh': 'guh',
+  'ck': 'ck',
   'ng': 'ng',
   'nk': 'nk',
-  'ck': 'ck',
+
+  // ========== COMMON SHORT WORDS/SYLLABLES ==========
+  // These get spelled out letter by letter - give them full pronunciation
+  'the': 'thuh',
+  'to': 'too',
+  'be': 'bee',
+  'he': 'hee',
+  'we': 'wee',
+  'me': 'mee',
+  'my': 'my',
+  'by': 'by',
+  'so': 'so',
+  'go': 'go',
+  'no': 'no',
+  'do': 'doo',
 };
 
 // Convert a syllable to a pronounceable form for TTS
@@ -465,29 +499,54 @@ function getSyllablePronunciation(syllable: string): string {
   const lower = syllable.toLowerCase();
 
   // Check for exact match first
+  // 1. Check for exact match first
   if (SYLLABLE_PRONUNCIATION[lower]) {
     return SYLLABLE_PRONUNCIATION[lower];
   }
 
-  // Check if syllable ends with a known suffix
-  for (const [suffix, pronunciation] of Object.entries(SYLLABLE_PRONUNCIATION)) {
-    if (lower === suffix) {
-      return pronunciation;
+  // 2. Check if syllable ENDS with a known suffix (longest match first)
+  const sortedSuffixes = Object.keys(SYLLABLE_PRONUNCIATION).sort((a, b) => b.length - a.length);
+  for (const suffix of sortedSuffixes) {
+    if (lower.endsWith(suffix) && lower.length > suffix.length) {
+      // Get the prefix part and combine with suffix pronunciation
+      const prefix = lower.slice(0, -suffix.length);
+      const suffixPronunciation = SYLLABLE_PRONUNCIATION[suffix];
+      // If prefix is pronounceable, combine them
+      if (/[aeiou]/.test(prefix) || prefix.length >= 2) {
+        return prefix + '-' + suffixPronunciation;
+      }
     }
   }
 
-  // If syllable is very short (1-2 chars) and might be spelled out,
-  // add a schwa sound to make it pronounceable
+  // 3. Check if syllable STARTS with a consonant-le pattern ending
+  // Handle cases like "tle" at the start of a syllable (shouldn't happen but be safe)
+  const consonantLeEndings = ['tle', 'ble', 'dle', 'fle', 'gle', 'kle', 'ple', 'zle', 'cle', 'sle', 'stle'];
+  for (const ending of consonantLeEndings) {
+    if (lower === ending) {
+      return SYLLABLE_PRONUNCIATION[ending] || lower;
+    }
+  }
+
+  // 4. If syllable is very short (1-2 chars) without vowels, make it pronounceable
   if (lower.length === 1 && !/[aeiou]/.test(lower)) {
-    return lower + 'uh'; // e.g., 's' → 'suh'
+    // Single consonant - add schwa to prevent spelling
+    return lower + 'uh';
   }
 
-  // For 2-letter syllables without vowels, add schwa
   if (lower.length === 2 && !/[aeiou]/.test(lower)) {
-    return lower + 'uh'; // e.g., 'th' → 'thuh'
+    // Two consonants without vowel - check if it's a digraph
+    if (SYLLABLE_PRONUNCIATION[lower]) {
+      return SYLLABLE_PRONUNCIATION[lower];
+    }
+    return lower + 'uh';
   }
 
-  // Return as-is if it looks pronounceable
+  // 5. For 3-letter syllables without vowels, add schwa
+  if (lower.length === 3 && !/[aeiou]/.test(lower)) {
+    return lower + 'uh';
+  }
+
+  // 6. Return as-is if it looks pronounceable (has a vowel)
   return syllable;
 }
 
@@ -498,27 +557,14 @@ export async function speakSyllables(word: string, onSyllable?: (index: number) 
   for (let i = 0; i < syllables.length; i++) {
     if (onSyllable) onSyllable(i);
 
-    await new Promise<void>((resolve) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) {
-        setTimeout(resolve, 500);
-        return;
-      }
+    // Get the pronounceable form of the syllable
+    const pronounceable = getSyllablePronunciation(syllables[i]);
 
-      // Get the pronounceable form of the syllable
-      const pronounceable = getSyllablePronunciation(syllables[i]);
+    // Use the centralized speak function with slower rate for syllables
+    await speak(pronounceable, 0.5);
 
-      const utterance = new SpeechSynthesisUtterance(pronounceable);
-      utterance.rate = 0.6; // Slightly slower for clarity
-      utterance.pitch = 1;
-      utterance.lang = 'en-US';
-
-      utterance.onend = () => {
-        setTimeout(resolve, 400); // Pause between syllables
-      };
-      utterance.onerror = () => resolve();
-
-      window.speechSynthesis.speak(utterance);
-    });
+    // Pause between syllables
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
 }
 
@@ -575,22 +621,8 @@ export async function speakPhonicsHint(word: string, letterIndex: number): Promi
   const hint = getPhonicsHintForPosition(word, letterIndex);
   if (!hint) return;
 
-  return new Promise<void>((resolve) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setTimeout(resolve, 500);
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(hint.pronunciation);
-    utterance.rate = 0.5; // Slower for hint
-    utterance.pitch = 1;
-    utterance.lang = 'en-US';
-
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
-
-    window.speechSynthesis.speak(utterance);
-  });
+  // Use the centralized speak function
+  await speak(hint.pronunciation, 0.5);
 }
 
 // Get all letter-to-sound mappings for a word

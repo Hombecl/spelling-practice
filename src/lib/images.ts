@@ -1,4 +1,117 @@
-// Word image utilities using Unsplash
+// Word image utilities using Unsplash and emoji fallbacks
+
+// Emoji mappings for words - more memorable for children
+const WORD_EMOJIS: Record<string, string> = {
+  // Animals
+  cat: '🐱', dog: '🐕', bird: '🐦', fish: '🐟', pig: '🐷', hen: '🐔',
+  duck: '🦆', frog: '🐸', bear: '🐻', lion: '🦁', horse: '🐴', mouse: '🐭',
+  sheep: '🐑', snake: '🐍', tiger: '🐯', zebra: '🦓', fox: '🦊', bat: '🦇',
+  rat: '🐀', ant: '🐜', bee: '🐝', cow: '🐄', goat: '🐐', owl: '🦉',
+  rabbit: '🐰', monkey: '🐵', elephant: '🐘', giraffe: '🦒', kangaroo: '🦘',
+  butterfly: '🦋', spider: '🕷️', whale: '🐋', dolphin: '🐬', shark: '🦈',
+  penguin: '🐧', panda: '🐼', koala: '🐨', chicken: '🐓', turkey: '🦃',
+  fairy: '🧚', fairies: '🧚‍♀️',
+
+  // Food
+  apple: '🍎', cake: '🎂', milk: '🥛', rice: '🍚', bread: '🍞', juice: '🧃',
+  pizza: '🍕', water: '💧', egg: '🥚', banana: '🍌', grape: '🍇', orange: '🍊',
+  cherry: '🍒', strawberry: '🍓', watermelon: '🍉', peach: '🍑', pear: '🍐',
+  cookie: '🍪', candy: '🍬', chocolate: '🍫', ice: '🧊', cheese: '🧀',
+  butter: '🧈', honey: '🍯', meat: '🥩', beef: '🥩', pork: '🥓',
+  vegetable: '🥬', carrot: '🥕', corn: '🌽', tomato: '🍅', potato: '🥔',
+  onion: '🧅', mushroom: '🍄', salad: '🥗', soup: '🍲', noodle: '🍜',
+
+  // Nature
+  sun: '☀️', moon: '🌙', star: '⭐', tree: '🌳', rain: '🌧️', snow: '❄️',
+  flower: '🌸', cloud: '☁️', rainbow: '🌈', mountain: '⛰️', ocean: '🌊',
+  beach: '🏖️', forest: '🌲', river: '🏞️', leaf: '🍃', grass: '🌿',
+  wind: '💨', fire: '🔥', earth: '🌍', sky: '🌤️', night: '🌃',
+
+  // Objects
+  book: '📚', ball: '⚽', cup: '☕', hat: '🎩', bag: '👜', pen: '🖊️',
+  box: '📦', door: '🚪', desk: '🪑', lamp: '💡', chair: '🪑', table: '🪑',
+  clock: '🕐', phone: '📱', bed: '🛏️', key: '🔑', bell: '🔔', gift: '🎁',
+  toy: '🧸', doll: '🪆', kite: '🪁', drum: '🥁', piano: '🎹', guitar: '🎸',
+  camera: '📷', computer: '💻', television: '📺', radio: '📻', mirror: '🪞',
+  umbrella: '☂️', brush: '🖌️', scissors: '✂️', ruler: '📏', pencil: '✏️',
+
+  // Transport
+  bus: '🚌', car: '🚗', ship: '🚢', boat: '⛵', bike: '🚲', train: '🚆',
+  plane: '✈️', truck: '🚚', taxi: '🚕', helicopter: '🚁', rocket: '🚀',
+  bicycle: '🚴', motorcycle: '🏍️', ambulance: '🚑', firetruck: '🚒',
+
+  // Colors (use colored circles)
+  red: '🔴', blue: '🔵', pink: '🩷', green: '🟢', black: '⚫', white: '⚪',
+  brown: '🟤', yellow: '🟡', purple: '🟣',
+
+  // Places
+  house: '🏠', school: '🏫', hospital: '🏥', church: '⛪', park: '🏞️',
+  library: '📚', museum: '🏛️', restaurant: '🍽️', hotel: '🏨', airport: '✈️',
+  station: '🚉', shop: '🏪', market: '🛒', bank: '🏦', office: '🏢',
+  garden: '🌻', farm: '🌾', zoo: '🦁',
+
+  // People
+  family: '👨‍👩‍👧‍👦', friend: '🧑‍🤝‍🧑', mother: '👩', father: '👨', sister: '👧',
+  brother: '👦', teacher: '👩‍🏫', student: '🧑‍🎓', doctor: '👨‍⚕️', nurse: '👩‍⚕️',
+  police: '👮', firefighter: '🧑‍🚒', chef: '👨‍🍳', farmer: '🧑‍🌾', baby: '👶',
+  boy: '👦', girl: '👧', man: '👨', woman: '👩', king: '🤴', queen: '👸',
+  prince: '🤴', princess: '👸',
+
+  // Body parts
+  eye: '👁️', ear: '👂', nose: '👃', mouth: '👄', hand: '✋', foot: '🦶',
+  head: '🗣️', face: '😊', hair: '💇', finger: '👆', leg: '🦵', arm: '💪',
+  tooth: '🦷', heart: '❤️', brain: '🧠',
+
+  // Weather
+  sunny: '☀️', cloudy: '☁️', rainy: '🌧️', snowy: '❄️', windy: '💨',
+  stormy: '⛈️', foggy: '🌫️', hot: '🥵', cold: '🥶',
+
+  // Actions (use representative emojis)
+  run: '🏃', sit: '🪑', jump: '🦘', walk: '🚶', swim: '🏊', play: '🎮',
+  read: '📖', sing: '🎤', dance: '💃', write: '✍️', sleep: '😴', smile: '😊',
+  eat: '🍽️', drink: '🥤', cook: '👨‍🍳', clean: '🧹', wash: '🧼', toothbrush: '🪥',
+  cry: '😢', laugh: '😄', think: '🤔', listen: '👂', look: '👀', talk: '💬',
+
+  // Feelings
+  happy: '😊', sad: '😢', angry: '😠', scared: '😨', tired: '😫',
+  excited: '🤩', surprised: '😲', proud: '😤', shy: '😳', brave: '💪',
+  kind: '🥰', beautiful: '😍', ugly: '👹', strong: '💪', weak: '😫',
+
+  // Numbers (spelled out)
+  one: '1️⃣', two: '2️⃣', three: '3️⃣', four: '4️⃣', five: '5️⃣',
+  six: '6️⃣', seven: '7️⃣', eight: '8️⃣', nine: '9️⃣', ten: '🔟',
+
+  // Time
+  morning: '🌅', afternoon: '🌤️', evening: '🌆', midnight: '🌙',
+  today: '📅', tomorrow: '📆', yesterday: '📆', week: '📅', month: '📅',
+  year: '🗓️', spring: '🌸', summer: '☀️', autumn: '🍂', winter: '❄️',
+
+  // Shapes
+  circle: '⭕', square: '⬜', triangle: '🔺', rectangle: '▬',
+  diamond: '💎',
+
+  // School items
+  classroom: '🏫', blackboard: '📋', chalk: '🖍️', eraser: '🧽',
+  notebook: '📓', textbook: '📖', homework: '📝', test: '📝', exam: '📝',
+
+  // Sports
+  football: '⚽', basketball: '🏀', tennis: '🎾', baseball: '⚾',
+  volleyball: '🏐', golf: '⛳', hockey: '🏒', skiing: '⛷️', skating: '⛸️',
+
+  // Music
+  music: '🎵', song: '🎶', band: '🎸', concert: '🎤', instrument: '🎹',
+
+  // Miscellaneous
+  birthday: '🎂', party: '🎉', wedding: '💒', christmas: '🎄', halloween: '🎃',
+  love: '❤️', peace: '☮️', magic: '✨', dream: '💭', wish: '⭐',
+  secret: '🤫', story: '📖', adventure: '🗺️', treasure: '💎', castle: '🏰',
+};
+
+// Get emoji for a word
+export function getWordEmoji(word: string): string | null {
+  const w = word.toLowerCase().trim();
+  return WORD_EMOJIS[w] || null;
+}
 
 // Unsplash Source URL (free, no API key needed for basic usage)
 export function getWordImageUrl(word: string, size: number = 300): string {
@@ -145,4 +258,44 @@ export function getImageForWord(word: string): string | null {
 // Check if we have a curated image for a word
 export function hasCuratedImage(word: string): boolean {
   return word.toLowerCase().trim() in CURATED_IMAGES;
+}
+
+// Pexels image cache (client-side)
+const pexelsCache = new Map<string, string | null>();
+
+// Fetch image from Pexels API (async)
+export async function fetchPexelsImage(word: string): Promise<string | null> {
+  const w = word.toLowerCase().trim();
+
+  // Check local cache first
+  if (pexelsCache.has(w)) {
+    return pexelsCache.get(w) || null;
+  }
+
+  try {
+    const response = await fetch(`/api/image?word=${encodeURIComponent(w)}`);
+    const data = await response.json();
+
+    if (data.url) {
+      pexelsCache.set(w, data.url);
+      return data.url;
+    }
+
+    pexelsCache.set(w, null);
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch Pexels image:', error);
+    return null;
+  }
+}
+
+// Check if Pexels is configured (has API key)
+export async function isPexelsConfigured(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/image?word=test');
+    const data = await response.json();
+    return data.source === 'pexels';
+  } catch {
+    return false;
+  }
 }
