@@ -399,6 +399,98 @@ export async function speakPhonics(word: string, onSound?: (index: number) => vo
   }
 }
 
+// Pronunciation hints for syllables that TTS might mispronounce
+// Maps written syllables to phonetic spellings that TTS can read correctly
+const SYLLABLE_PRONUNCIATION: Record<string, string> = {
+  // Plural/verb suffixes
+  'ies': 'eez',      // fairies → fair-eez
+  'ves': 'vz',       // leaves → lea-vz
+  'es': 'iz',        // boxes → box-iz
+  's': 'ss',         // cats → cat-ss (prevent spelling)
+
+  // Common suffixes that TTS struggles with
+  'tion': 'shun',    // nation → na-shun
+  'sion': 'zhun',    // vision → vi-zhun
+  'ious': 'ee-us',   // curious → cur-ee-us
+  'eous': 'ee-us',   // gorgeous → gorg-ee-us
+  'ous': 'us',       // famous → fam-us
+  'ness': 'niss',    // happiness → happi-niss
+  'ment': 'ment',    // treatment (usually ok)
+  'ful': 'full',     // beautiful → beauti-full
+  'less': 'liss',    // hopeless → hope-liss
+  'able': 'uh-bull', // capable → cap-uh-bull
+  'ible': 'ih-bull', // possible → poss-ih-bull
+  'ing': 'ing',      // singing (usually ok)
+  'ed': 'ed',        // wanted (usually ok)
+  'er': 'er',        // teacher (usually ok)
+  'est': 'ist',      // biggest → bigg-ist
+  'ly': 'lee',       // quickly → quick-lee
+  'ty': 'tee',       // beauty → beau-tee
+  'ity': 'ih-tee',   // city → cih-tee
+  'al': 'ul',        // animal → anim-ul
+  'ial': 'ee-ul',    // special → spesh-ee-ul
+  'ic': 'ick',       // magic → mag-ick
+  'ical': 'ih-kul',  // magical → mag-ih-kul
+  'ant': 'ant',      // elephant (usually ok)
+  'ent': 'ent',      // student (usually ok)
+  'ance': 'unce',    // dance (usually ok)
+  'ence': 'ence',    // fence (usually ok)
+  'ure': 'yer',      //ature → na-yer
+  'ture': 'cher',    // nature → na-cher
+  'sure': 'zher',    // measure → mea-zher
+
+  // Prefixes
+  'un': 'un',        // (usually ok)
+  're': 'ree',       // redo → ree-do
+  'pre': 'pree',     // preview → pree-view
+  'dis': 'diss',     // disagree → diss-agree
+  'mis': 'miss',     // mistake → miss-take
+  'non': 'non',      // (usually ok)
+  'over': 'oh-ver',  // overcome → oh-ver-come
+  'under': 'un-der', // (usually ok)
+
+  // Short syllables that might be spelled out
+  'th': 'thuh',
+  'ch': 'chuh',
+  'sh': 'shuh',
+  'wh': 'wuh',
+  'ph': 'fuh',
+  'ng': 'ng',
+  'nk': 'nk',
+  'ck': 'ck',
+};
+
+// Convert a syllable to a pronounceable form for TTS
+function getSyllablePronunciation(syllable: string): string {
+  const lower = syllable.toLowerCase();
+
+  // Check for exact match first
+  if (SYLLABLE_PRONUNCIATION[lower]) {
+    return SYLLABLE_PRONUNCIATION[lower];
+  }
+
+  // Check if syllable ends with a known suffix
+  for (const [suffix, pronunciation] of Object.entries(SYLLABLE_PRONUNCIATION)) {
+    if (lower === suffix) {
+      return pronunciation;
+    }
+  }
+
+  // If syllable is very short (1-2 chars) and might be spelled out,
+  // add a schwa sound to make it pronounceable
+  if (lower.length === 1 && !/[aeiou]/.test(lower)) {
+    return lower + 'uh'; // e.g., 's' → 'suh'
+  }
+
+  // For 2-letter syllables without vowels, add schwa
+  if (lower.length === 2 && !/[aeiou]/.test(lower)) {
+    return lower + 'uh'; // e.g., 'th' → 'thuh'
+  }
+
+  // Return as-is if it looks pronounceable
+  return syllable;
+}
+
 // Speak syllables one by one (e.g., "con" - "ven" - "ient")
 export async function speakSyllables(word: string, onSyllable?: (index: number) => void): Promise<void> {
   const syllables = breakIntoSyllables(word);
@@ -412,7 +504,10 @@ export async function speakSyllables(word: string, onSyllable?: (index: number) 
         return;
       }
 
-      const utterance = new SpeechSynthesisUtterance(syllables[i]);
+      // Get the pronounceable form of the syllable
+      const pronounceable = getSyllablePronunciation(syllables[i]);
+
+      const utterance = new SpeechSynthesisUtterance(pronounceable);
       utterance.rate = 0.6; // Slightly slower for clarity
       utterance.pitch = 1;
       utterance.lang = 'en-US';
