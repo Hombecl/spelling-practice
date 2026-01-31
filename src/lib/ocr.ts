@@ -22,6 +22,12 @@ interface GeminiOCRResponse {
   useLocalOCR?: boolean;
 }
 
+// OCR scan options
+export interface OCRScanOptions {
+  mode: 'select' | 'highlighted' | 'smart';
+  highlightColor?: 'yellow' | 'pink' | 'green' | 'blue' | 'orange' | 'any';
+}
+
 export interface HighlightDetectionResult {
   hasHighlights: boolean;
   highlightedRegions: { x: number; y: number; width: number; height: number }[];
@@ -193,7 +199,8 @@ async function fileToBase64(file: File): Promise<string> {
 // Try Gemini OCR via our API route (OpenRouter)
 async function tryGeminiOCR(
   imageSource: File | string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  options?: OCRScanOptions
 ): Promise<OCRResult | null> {
   try {
     onProgress?.(10);
@@ -211,7 +218,11 @@ async function tryGeminiOCR(
     const response = await fetch('/api/ocr', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: imageData }),
+      body: JSON.stringify({
+        image: imageData,
+        mode: options?.mode || 'smart',
+        highlightColor: options?.highlightColor,
+      }),
     });
 
     onProgress?.(80);
@@ -244,10 +255,11 @@ async function tryGeminiOCR(
 // Tries Gemini OCR first, falls back to Tesseract.js
 export async function extractWordsFromImage(
   imageSource: File | string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
+  options?: OCRScanOptions
 ): Promise<OCRResult> {
   // Try Gemini OCR first (better accuracy, can detect highlights)
-  const geminiResult = await tryGeminiOCR(imageSource, onProgress);
+  const geminiResult = await tryGeminiOCR(imageSource, onProgress, options);
   if (geminiResult) {
     return geminiResult;
   }
