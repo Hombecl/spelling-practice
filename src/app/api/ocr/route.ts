@@ -184,14 +184,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Check if a word looks like a valid English word
+function isValidEnglishWord(word: string): boolean {
+  // Must be at least 3 characters (skip 2-letter words like "ey")
+  if (word.length < 3) return false;
+
+  // Must only contain letters
+  if (!/^[a-zA-Z]+$/.test(word)) return false;
+
+  // Must have at least one vowel
+  if (!/[aeiou]/i.test(word)) return false;
+
+  // Skip words that are just vowels or consonants repeated
+  if (/^(.)\1+$/.test(word)) return false;
+
+  // Skip words with too many consecutive consonants (likely OCR errors)
+  if (/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(word)) return false;
+
+  // Skip words with too many consecutive vowels (likely OCR errors)
+  if (/[aeiou]{4,}/i.test(word)) return false;
+
+  // Common OCR garbage patterns to skip
+  const garbagePatterns = [
+    /^[aeiou]{2,3}$/i,  // Just 2-3 vowels like "ey", "oa", "ia"
+    /^[bcdfghjklmnpqrstvwxyz]{2,3}$/i,  // Just consonants
+    /^.{1,2}$/,  // 1-2 character "words"
+  ];
+
+  for (const pattern of garbagePatterns) {
+    if (pattern.test(word)) return false;
+  }
+
+  return true;
+}
+
 // Parse the OCR response to extract words and highlighted words
 function parseOCRResponse(text: string, mode: string): { words: string[]; highlightedWords: string[] } {
   const words: string[] = [];
   const highlightedWords: string[] = [];
   const seen = new Set<string>();
 
-  // Common stop words to skip (only in smart mode, highlighted mode trusts user's selections)
-  const skipWords = mode === 'smart' ? new Set([
+  // Common stop words to skip (skip in both modes for cleaner results)
+  const skipWords = new Set([
     'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
     'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
     'could', 'should', 'may', 'might', 'must', 'shall', 'can',
@@ -203,7 +237,10 @@ function parseOCRResponse(text: string, mode: string): { words: string[]; highli
     'who', 'which', 'why', 'how', 'all', 'each', 'every', 'both',
     'few', 'more', 'most', 'other', 'some', 'such', 'than', 'too',
     'very', 'just', 'also', 'now', 'only', 'then', 'about', 'into',
-  ]) : new Set<string>();
+  ]);
+
+  // Log raw response for debugging
+  console.log('[OCR] Raw Gemini response:', text.substring(0, 500));
 
   // Split by lines and process each
   const lines = text.split(/[\n\r]+/);
@@ -212,45 +249,53 @@ function parseOCRResponse(text: string, mode: string): { words: string[]; highli
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Skip markdown artifacts or explanatory text
-    if (trimmed.startsWith('#') || trimmed.startsWith('-') || trimmed.includes(':')) continue;
+    // Skip markdown artifacts, explanatory text, or sentences
+    if (trimmed.startsWith('#')) continue;
+    if (trimmed.startsWith('-') && trimmed.length > 20) continue; // Skip long bullet points (explanations)
+    if (trimmed.includes(':')) continue;
+    if (trimmed.split(' ').length > 3) continue; // Skip sentences (more than 3 words)
 
     // Check if it's a highlighted word (marked with **)
     const isHighlighted = trimmed.startsWith('**') && trimmed.endsWith('**');
 
-    // Extract the word
+    // Extract the word - handle both **word** and plain word formats
     let word = trimmed.replace(/^\*\*|\*\*$/g, '').trim();
+
+    // If the line has multiple words, try to extract just the word (not explanations)
+    if (word.includes(' ')) {
+      // Take the first word only
+      word = word.split(' ')[0];
+    }
+
+    // Remove any list markers like "1.", "•", "-"
+    word = word.replace(/^[\d\.\-\•\*]+\s*/, '');
 
     // Clean the word - remove punctuation, numbers, etc.
     word = word.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '');
 
-    // Skip if empty or too short
-    if (word.length < 2) continue;
-
-    // Skip if contains numbers or non-ASCII
-    if (/\d/.test(word) || /[^\x00-\x7F]/.test(word)) continue;
-
     // Convert to lowercase
     word = word.toLowerCase();
 
-    // Skip stop words (in smart mode only)
+    // Skip if not a valid English word
+    if (!isValidEnglishWord(word)) continue;
+
+    // Skip stop words
     if (skipWords.has(word)) continue;
 
     // Skip if already seen
     if (seen.has(word)) continue;
 
-    // Must have at least one vowel
-    if (!/[aeiou]/.test(word)) continue;
-
     seen.add(word);
     words.push(word);
 
-    // In highlighted mode, ALL words are highlighted
+    // In highlighted mode, ALL valid words are highlighted
     // In smart mode, only ** marked words are highlighted
     if (mode === 'highlighted' || isHighlighted) {
       highlightedWords.push(word);
     }
   }
+
+  console.log('[OCR] Parsed words:', words.length, 'Highlighted:', highlightedWords.length);
 
   return { words, highlightedWords };
 }

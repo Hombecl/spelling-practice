@@ -16,11 +16,16 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   // Pre-scan selection state
   const [scanMode, setScanMode] = useState<ScanMode>('select');
   const [selectedColors, setSelectedColors] = useState<Set<HighlightColor>>(new Set(['yellow']));
+  const [anyColor, setAnyColor] = useState(false);
+
+  // Multiple images state
+  const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
   const [extractedWords, setExtractedWords] = useState<string[]>([]);
   const [highlightedWords, setHighlightedWords] = useState<Set<string>>(new Set());
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
@@ -28,56 +33,108 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
   const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'tesseract' | null>(null);
 
+  const MAX_IMAGES = 3;
+
   // Separate refs for camera and gallery
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    // Show preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setPreview(e.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Convert FileList to array and limit to MAX_IMAGES
+    const fileArray = Array.from(files).slice(0, MAX_IMAGES);
 
-    // Process with OCR
+    // Create previews for all files
+    const newImages: { file: File; preview: string }[] = [];
+    for (const file of fileArray) {
+      const preview = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.readAsDataURL(file);
+      });
+      newImages.push({ file, preview });
+    }
+
+    setImages(newImages);
+    setCurrentImageIndex(0);
+
+    // Process all images
+    await processAllImages(newImages);
+  };
+
+  const processAllImages = async (imagesToProcess: { file: File; preview: string }[]) => {
     setIsProcessing(true);
     setProgress(0);
     setError(null);
+
+    const allWords: string[] = [];
+    const allHighlightedWords: string[] = [];
+    let lastSource: 'gemini-ocr' | 'tesseract' | null = null;
 
     // Pass scan options to OCR
     const colorsArray = Array.from(selectedColors);
     const ocrOptions = {
       mode: scanMode,
-      highlightColors: scanMode === 'highlighted' ? colorsArray : undefined,
+      // If "any color" is selected, pass undefined to let AI detect any highlighter
+      highlightColors: scanMode === 'highlighted' && !anyColor ? colorsArray : undefined,
     };
 
-    const result = await extractWordsFromImage(file, (p) => setProgress(p), ocrOptions);
+    for (let i = 0; i < imagesToProcess.length; i++) {
+      const image = imagesToProcess[i];
+      setCurrentImageIndex(i);
+      setProcessingStatus(`處理緊第 ${i + 1}/${imagesToProcess.length} 張相...`);
+
+      const result = await extractWordsFromImage(
+        image.file,
+        (p) => {
+          // Calculate overall progress across all images
+          const baseProgress = (i / imagesToProcess.length) * 100;
+          const imageProgress = (p / imagesToProcess.length);
+          setProgress(Math.round(baseProgress + imageProgress));
+        },
+        ocrOptions
+      );
+
+      if (result.success) {
+        // Filter to valid words and add to collection (avoid duplicates)
+        const validWords = result.words.filter(isValidEnglishWord);
+        const validHighlighted = result.highlightedWords.filter(isValidEnglishWord);
+
+        for (const word of validWords) {
+          if (!allWords.includes(word)) {
+            allWords.push(word);
+          }
+        }
+        for (const word of validHighlighted) {
+          if (!allHighlightedWords.includes(word)) {
+            allHighlightedWords.push(word);
+          }
+        }
+        lastSource = result.source || null;
+      }
+    }
 
     setIsProcessing(false);
+    setProcessingStatus('');
+    setProgress(100);
 
-    if (result.success) {
-      // Filter to valid words
-      const validWords = result.words.filter(isValidEnglishWord);
-      const validHighlighted = result.highlightedWords.filter(isValidEnglishWord);
-
-      setExtractedWords(validWords);
-      setHighlightedWords(new Set(validHighlighted));
-      setOcrSource(result.source || null);
+    if (allWords.length > 0) {
+      setExtractedWords(allWords);
+      setHighlightedWords(new Set(allHighlightedWords));
+      setOcrSource(lastSource);
 
       // If highlighted words found, select only those by default
-      if (validHighlighted.length > 0) {
-        setSelectedWords(new Set(validHighlighted));
+      if (allHighlightedWords.length > 0) {
+        setSelectedWords(new Set(allHighlightedWords));
         setFilterMode('highlighted');
       } else {
-        setSelectedWords(new Set(validWords));
+        setSelectedWords(new Set(allWords));
         setFilterMode('all');
       }
     } else {
-      setError(result.error || 'OCR 處理失敗');
+      setError('搵唔到英文字');
     }
   };
 
@@ -133,17 +190,25 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
 
   const resetToSelection = () => {
     setScanMode('select');
-    setPreview(null);
+    setImages([]);
+    setCurrentImageIndex(0);
     setExtractedWords([]);
     setSelectedWords(new Set());
     setHighlightedWords(new Set());
     setError(null);
+    setAnyColor(false);
+    setSelectedColors(new Set(['yellow']));
+    setProcessingStatus('');
   };
 
   const toggleColor = (color: HighlightColor) => {
+    // If "any color" is on, turn it off when selecting specific colors
+    if (anyColor) {
+      setAnyColor(false);
+    }
     const newColors = new Set(selectedColors);
     if (newColors.has(color)) {
-      // Don't allow deselecting if it's the last one
+      // Don't allow deselecting if it's the last one (unless any color is selected)
       if (newColors.size > 1) {
         newColors.delete(color);
       }
@@ -153,7 +218,19 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     setSelectedColors(newColors);
   };
 
+  const toggleAnyColor = () => {
+    setAnyColor(!anyColor);
+    // When turning on "any color", clear specific selections
+    if (!anyColor) {
+      setSelectedColors(new Set());
+    } else {
+      // When turning off, default to yellow
+      setSelectedColors(new Set(['yellow']));
+    }
+  };
+
   const selectAllColors = () => {
+    setAnyColor(false);
     setSelectedColors(new Set(['yellow', 'pink', 'green', 'blue', 'orange']));
   };
 
@@ -167,6 +244,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
 
   // Get selected colors text for display
   const getSelectedColorsText = () => {
+    if (anyColor) return '任何顏色';
     if (selectedColors.size === 5) return '所有顏色';
     if (selectedColors.size === 1) {
       const color = Array.from(selectedColors)[0];
@@ -192,7 +270,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
         {/* Content */}
         <div className="p-4 overflow-y-auto flex-1">
           {/* Step 1: Mode Selection */}
-          {scanMode === 'select' && !preview && !isProcessing && (
+          {scanMode === 'select' && images.length === 0 && !isProcessing && (
             <div className="space-y-4">
               <p className="text-center text-gray-600 mb-4">
                 請先揀返你嘅教科書情況：
@@ -233,7 +311,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
           )}
 
           {/* Step 1b: Color Selection (if highlighted mode) */}
-          {scanMode === 'highlighted' && !preview && !isProcessing && (
+          {scanMode === 'highlighted' && images.length === 0 && !isProcessing && (
             <div className="space-y-4">
               <button
                 onClick={() => setScanMode('select')}
@@ -258,27 +336,54 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 可以揀多過一種顏色
               </p>
 
+              {/* "Any color" option */}
+              <button
+                onClick={toggleAnyColor}
+                className={`w-full p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${
+                  anyColor
+                    ? 'bg-gradient-to-r from-yellow-200 via-pink-200 to-blue-200 border-purple-400 ring-2 ring-purple-300'
+                    : 'bg-gradient-to-r from-yellow-50 via-pink-50 to-blue-50 border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                  anyColor ? 'bg-white border-gray-400' : 'border-gray-300'
+                }`}>
+                  {anyColor && <span className="text-green-600 text-sm">✓</span>}
+                </div>
+                <span className="text-xl">🌈</span>
+                <span className="text-sm font-medium">任何顏色</span>
+                <span className="text-xs text-gray-500 ml-auto">（自動偵測）</span>
+              </button>
+
+              {/* Divider */}
+              <div className="flex items-center gap-2 text-xs text-gray-400">
+                <div className="flex-1 h-px bg-gray-200"></div>
+                <span>或者揀特定顏色</span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+
               {/* Color checkboxes */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className={`grid grid-cols-2 gap-2 ${anyColor ? 'opacity-50' : ''}`}>
                 {highlightColorOptions.map((option) => {
                   const isSelected = selectedColors.has(option.value);
                   return (
                     <button
                       key={option.value}
                       onClick={() => toggleColor(option.value)}
+                      disabled={anyColor}
                       className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${
-                        isSelected
+                        isSelected && !anyColor
                           ? option.selectedClass
                           : `${option.bgClass} border-gray-200 hover:border-gray-300`
-                      }`}
+                      } ${anyColor ? 'cursor-not-allowed' : ''}`}
                     >
                       {/* Checkbox indicator */}
                       <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                        isSelected
+                        isSelected && !anyColor
                           ? 'bg-white border-gray-400'
                           : 'border-gray-300'
                       }`}>
-                        {isSelected && <span className="text-green-600 text-sm">✓</span>}
+                        {isSelected && !anyColor && <span className="text-green-600 text-sm">✓</span>}
                       </div>
                       <span className="text-xl">{option.emoji}</span>
                       <span className="text-sm font-medium">{option.label}</span>
@@ -300,6 +405,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 ref={galleryInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -325,12 +431,15 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 <p className="text-center text-xs text-gray-400">
                   會搵出 {getSelectedColorsText()} 螢光筆標記嘅字
                 </p>
+                <p className="text-center text-xs text-gray-400">
+                  📚 可以一次過揀最多 {MAX_IMAGES} 張相
+                </p>
               </div>
             </div>
           )}
 
           {/* Step 1c: Smart mode - direct to camera */}
-          {scanMode === 'smart' && !preview && !isProcessing && (
+          {scanMode === 'smart' && images.length === 0 && !isProcessing && (
             <div className="space-y-4">
               <button
                 onClick={() => setScanMode('select')}
@@ -369,6 +478,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 ref={galleryInputRef}
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -390,6 +500,9 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                   相簿
                 </button>
               </div>
+              <p className="text-center text-xs text-gray-400 mt-2">
+                📚 可以一次過揀最多 {MAX_IMAGES} 張相
+              </p>
             </div>
           )}
 
@@ -397,9 +510,36 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
           {isProcessing && (
             <div className="text-center py-8">
               <div className="text-5xl mb-4 animate-pulse">🔍</div>
-              <p className="text-gray-600 font-bold mb-4">
+              <p className="text-gray-600 font-bold mb-2">
                 {scanMode === 'highlighted' ? '搵緊螢光筆標記...' : '識別緊生字...'}
               </p>
+              {processingStatus && (
+                <p className="text-sm text-blue-600 mb-4">{processingStatus}</p>
+              )}
+              {/* Image thumbnails during processing */}
+              {images.length > 1 && (
+                <div className="flex justify-center gap-2 mb-4">
+                  {images.map((img, idx) => (
+                    <div
+                      key={idx}
+                      className={`w-12 h-12 rounded-lg overflow-hidden border-2 ${
+                        idx === currentImageIndex
+                          ? 'border-blue-500 ring-2 ring-blue-300'
+                          : idx < currentImageIndex
+                          ? 'border-green-500 opacity-50'
+                          : 'border-gray-300 opacity-50'
+                      }`}
+                    >
+                      <img src={img.preview} alt={`第${idx + 1}張`} className="w-full h-full object-cover" />
+                      {idx < currentImageIndex && (
+                        <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center">
+                          <span className="text-white text-xs">✓</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="w-full bg-gray-200 rounded-full h-4 overflow-hidden">
                 <div
                   className="bg-blue-500 h-full transition-all duration-300"
@@ -425,15 +565,32 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
           )}
 
           {/* Results */}
-          {preview && extractedWords.length > 0 && !isProcessing && (
+          {images.length > 0 && extractedWords.length > 0 && !isProcessing && (
             <div>
-              {/* Preview Image */}
+              {/* Preview Images */}
               <div className="mb-4">
-                <img
-                  src={preview}
-                  alt="Uploaded"
-                  className="w-full h-32 object-cover rounded-xl"
-                />
+                {images.length === 1 ? (
+                  <img
+                    src={images[0].preview}
+                    alt="Uploaded"
+                    className="w-full h-32 object-cover rounded-xl"
+                  />
+                ) : (
+                  <div className="flex gap-2 overflow-x-auto pb-2">
+                    {images.map((img, idx) => (
+                      <div key={idx} className="flex-shrink-0 relative">
+                        <img
+                          src={img.preview}
+                          alt={`第${idx + 1}張`}
+                          className="h-24 w-auto rounded-lg object-cover"
+                        />
+                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                          {idx + 1}/{images.length}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Highlight Detection Notice */}
@@ -542,7 +699,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
           )}
 
           {/* No words found */}
-          {preview && extractedWords.length === 0 && !isProcessing && !error && (
+          {images.length > 0 && extractedWords.length === 0 && !isProcessing && !error && (
             <div className="text-center py-8">
               <div className="text-5xl mb-4">🤔</div>
               <p className="text-gray-600 font-bold mb-4">搵唔到英文字</p>
