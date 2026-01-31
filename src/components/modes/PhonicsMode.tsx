@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Word } from '@/lib/words';
 import { speakWord } from '@/lib/speech';
-import { getPhonicsBreakdown, getPronunciationGuide, speakPhonics } from '@/lib/phonics';
+import { getPhonicsBreakdown, speakSyllables } from '@/lib/phonics';
 import WordImage from '@/components/WordImage';
 import StarBurst from '@/components/StarBurst';
 
@@ -15,17 +15,16 @@ interface PhonicsModePros {
 
 export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePros) {
   const [step, setStep] = useState<'see' | 'listen' | 'phonics' | 'quiz'>('see');
-  const [activeSound, setActiveSound] = useState(-1);
+  const [activeSyllable, setActiveSyllable] = useState(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [quizAnswer, setQuizAnswer] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const breakdown = getPhonicsBreakdown(word.word);
-  const guide = getPronunciationGuide(word.word);
 
   useEffect(() => {
     setStep('see');
-    setActiveSound(-1);
+    setActiveSyllable(-1);
     setIsPlaying(false);
     setQuizAnswer(null);
     setShowSuccess(false);
@@ -38,16 +37,16 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
     if (step === 'see') setStep('listen');
   };
 
-  const handlePlayPhonics = async () => {
+  const handlePlaySyllables = async () => {
     if (isPlaying) return;
     setIsPlaying(true);
     setStep('phonics');
 
-    await speakPhonics(word.word, (index) => {
-      setActiveSound(index);
+    await speakSyllables(word.word, (index) => {
+      setActiveSyllable(index);
     });
 
-    setActiveSound(-1);
+    setActiveSyllable(-1);
     setIsPlaying(false);
   };
 
@@ -64,21 +63,6 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
       setTimeout(() => {
         onComplete(true, 1);
       }, 1500);
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'vowel':
-        return 'bg-red-100 text-red-700 border-red-400';
-      case 'consonant':
-        return 'bg-blue-100 text-blue-700 border-blue-400';
-      case 'blend':
-        return 'bg-purple-100 text-purple-700 border-purple-400';
-      case 'silent':
-        return 'bg-gray-100 text-gray-400 border-gray-300';
-      default:
-        return 'bg-gray-100 text-gray-700 border-gray-400';
     }
   };
 
@@ -148,7 +132,7 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
               🔈 再聽一次
             </button>
             <button
-              onClick={handlePlayPhonics}
+              onClick={handlePlaySyllables}
               disabled={isPlaying}
               className="px-6 py-3 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 active:scale-95"
             >
@@ -158,62 +142,50 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
         </div>
       )}
 
-      {/* Step 3: Phonics Breakdown */}
+      {/* Step 3: Phonics Breakdown - Syllable-based */}
       {(step === 'phonics' || step === 'quiz') && (
         <div className="w-full max-w-md">
-          {/* Phonics Sound Blocks */}
-          <div className="flex flex-wrap justify-center gap-2 mb-4">
-            {guide.map((item, index) => (
-              <div
-                key={index}
-                className={`
-                  relative px-4 py-3 rounded-xl border-3 text-center transition-all duration-200
-                  ${getTypeColor(item.type)}
-                  ${activeSound === index ? 'scale-125 ring-4 ring-yellow-400 z-10' : ''}
-                `}
-              >
-                <div className="text-2xl sm:text-3xl font-bold uppercase">{item.letter}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap justify-center gap-3 text-xs mb-4">
-            <div className="flex items-center gap-1">
-              <span className="w-4 h-4 bg-red-200 rounded border border-red-400"></span>
-              <span className="text-gray-600">元音 Vowel</span>
+          {/* Syllable Blocks - Main Display */}
+          <div className="bg-white rounded-2xl border-2 border-gray-200 p-6 mb-4">
+            <div className="text-sm font-bold text-gray-500 mb-3 text-center">
+              🔤 音節拆解 (Syllables)
             </div>
-            <div className="flex items-center gap-1">
-              <span className="w-4 h-4 bg-blue-200 rounded border border-blue-400"></span>
-              <span className="text-gray-600">輔音 Consonant</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="w-4 h-4 bg-purple-200 rounded border border-purple-400"></span>
-              <span className="text-gray-600">組合 Blend</span>
-            </div>
-          </div>
-
-          {/* Syllables */}
-          <div className="bg-white rounded-xl border-2 border-gray-200 p-4 mb-4">
-            <div className="text-sm font-bold text-gray-500 mb-2">音節 Syllables:</div>
-            <div className="flex gap-2 justify-center flex-wrap">
+            <div className="flex gap-3 justify-center flex-wrap items-center">
               {breakdown.syllables.map((syllable, index) => (
-                <span
-                  key={index}
-                  className="px-4 py-2 bg-green-100 text-green-700 rounded-full font-bold text-lg border-2 border-green-300"
-                >
-                  {syllable}
-                </span>
+                <div key={index} className="flex items-center gap-2">
+                  <div
+                    className={`
+                      px-5 py-4 rounded-2xl text-center transition-all duration-300
+                      ${activeSyllable === index
+                        ? 'bg-yellow-400 text-yellow-900 scale-110 ring-4 ring-yellow-300 shadow-lg'
+                        : 'bg-purple-100 text-purple-700 border-2 border-purple-300'
+                      }
+                    `}
+                  >
+                    <div className="text-2xl sm:text-3xl font-bold">{syllable}</div>
+                  </div>
+                  {index < breakdown.syllables.length - 1 && (
+                    <span className="text-2xl text-gray-400">-</span>
+                  )}
+                </div>
               ))}
             </div>
-            <div className="text-center text-gray-500 mt-2">
-              共 {breakdown.syllables.length} 個音節
+            <div className="text-center text-gray-500 mt-4 text-sm">
+              共 <span className="font-bold text-purple-600">{breakdown.syllables.length}</span> 個音節
+            </div>
+          </div>
+
+          {/* How to pronounce */}
+          <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 mb-4 text-center">
+            <div className="text-sm text-blue-600 mb-1">讀法：</div>
+            <div className="text-xl font-bold text-blue-800">
+              {breakdown.syllables.join(' - ')}
             </div>
           </div>
 
           {/* Pattern Info */}
           <div className="text-center mb-4">
-            <span className="px-4 py-2 bg-blue-50 text-blue-700 rounded-full text-sm border border-blue-200">
+            <span className="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm border border-gray-200">
               模式: {breakdown.pattern}
             </span>
           </div>
@@ -221,11 +193,11 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
           {step === 'phonics' && (
             <div className="flex gap-3 justify-center flex-wrap">
               <button
-                onClick={handlePlayPhonics}
+                onClick={handlePlaySyllables}
                 disabled={isPlaying}
-                className="px-6 py-3 bg-purple-100 text-purple-700 font-bold rounded-xl hover:bg-purple-200 active:scale-95"
+                className="px-6 py-3 bg-purple-500 text-white font-bold rounded-xl hover:bg-purple-600 active:scale-95 disabled:opacity-50"
               >
-                {isPlaying ? '🔊 播放中...' : '🔤 再聽 Phonics'}
+                {isPlaying ? '🔊 播放中...' : '🔊 再聽音節'}
               </button>
               <button
                 onClick={handleQuiz}

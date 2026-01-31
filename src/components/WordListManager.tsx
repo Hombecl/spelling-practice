@@ -7,6 +7,7 @@ import {
   createWordList,
   deleteWordList,
 } from '@/lib/customWords';
+import OCRScanner from '@/components/OCRScanner';
 
 interface WordListManagerProps {
   onSelectList: (list: CustomWordList) => void;
@@ -21,6 +22,7 @@ export default function WordListManager({
 }: WordListManagerProps) {
   const [lists, setLists] = useState<CustomWordList[]>([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [showOCR, setShowOCR] = useState(false);
   const [newName, setNewName] = useState('');
   const [newWords, setNewWords] = useState('');
   const [error, setError] = useState('');
@@ -63,6 +65,15 @@ export default function WordListManager({
         onUseBuiltIn();
       }
     }
+  };
+
+  const handleOCRWords = (words: string[]) => {
+    // Add OCR words to the text area
+    const existingWords = newWords.trim();
+    const newWordsText = words.join(', ');
+    setNewWords(existingWords ? `${existingWords}, ${newWordsText}` : newWordsText);
+    setShowOCR(false);
+    setShowCreate(true);
   };
 
   return (
@@ -130,14 +141,24 @@ export default function WordListManager({
 
       {/* Create new list */}
       {!showCreate ? (
-        <button
-          onClick={() => setShowCreate(true)}
-          className="w-full p-4 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-all"
-        >
-          <span className="text-2xl">➕</span>
-          <div className="font-medium mt-1">新增默書範圍</div>
-          <div className="text-sm">Add custom word list</div>
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex-1 p-4 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-all"
+          >
+            <span className="text-2xl">✏️</span>
+            <div className="font-medium mt-1">手動輸入</div>
+            <div className="text-sm">打字輸入生字</div>
+          </button>
+          <button
+            onClick={() => setShowOCR(true)}
+            className="flex-1 p-4 rounded-xl border-2 border-dashed border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-500 transition-all"
+          >
+            <span className="text-2xl">📷</span>
+            <div className="font-medium mt-1">掃描教科書</div>
+            <div className="text-sm">影相自動識字</div>
+          </button>
+        </div>
       ) : (
         <div className="p-4 rounded-xl border-2 border-blue-300 bg-blue-50">
           <h3 className="font-bold text-gray-700 mb-3">新增默書範圍</h3>
@@ -193,6 +214,13 @@ export default function WordListManager({
               取消
             </button>
             <button
+              onClick={() => setShowOCR(true)}
+              className="p-3 rounded-lg bg-green-100 text-green-700 font-bold hover:bg-green-200"
+              title="掃描教科書"
+            >
+              📷
+            </button>
+            <button
               onClick={handleCreate}
               className="flex-1 p-3 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600"
             >
@@ -200,6 +228,14 @@ export default function WordListManager({
             </button>
           </div>
         </div>
+      )}
+
+      {/* OCR Scanner Modal */}
+      {showOCR && (
+        <OCRScanner
+          onWordsExtracted={handleOCRWords}
+          onClose={() => setShowOCR(false)}
+        />
       )}
     </div>
   );

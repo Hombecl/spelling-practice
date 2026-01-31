@@ -264,7 +264,7 @@ export function getPronunciationGuide(word: string): { letter: string; type: 'co
   return guide;
 }
 
-// Speak phonics sounds one by one
+// Speak phonics sounds one by one (letter by letter - legacy)
 export async function speakPhonics(word: string, onSound?: (index: number) => void): Promise<void> {
   const sounds = identifySounds(word);
 
@@ -290,4 +290,37 @@ export async function speakPhonics(word: string, onSound?: (index: number) => vo
       window.speechSynthesis.speak(utterance);
     });
   }
+}
+
+// Speak syllables one by one (e.g., "con" - "ven" - "ient")
+export async function speakSyllables(word: string, onSyllable?: (index: number) => void): Promise<void> {
+  const syllables = breakIntoSyllables(word);
+
+  for (let i = 0; i < syllables.length; i++) {
+    if (onSyllable) onSyllable(i);
+
+    await new Promise<void>((resolve) => {
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+        setTimeout(resolve, 500);
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(syllables[i]);
+      utterance.rate = 0.6; // Slightly slower for clarity
+      utterance.pitch = 1;
+      utterance.lang = 'en-US';
+
+      utterance.onend = () => {
+        setTimeout(resolve, 400); // Pause between syllables
+      };
+      utterance.onerror = () => resolve();
+
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+}
+
+// Get syllables for a word (exported for UI use)
+export function getSyllables(word: string): string[] {
+  return breakIntoSyllables(word);
 }
