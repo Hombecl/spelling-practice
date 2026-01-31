@@ -29,75 +29,77 @@ function buildPrompt(mode: string, highlightColors?: string[]): string {
       colorText = colorNames.slice(0, -1).join(', ') + ' or ' + colorNames[colorNames.length - 1];
     }
 
-    return `You are an OCR assistant helping extract spelling words from HONG KONG PRIMARY SCHOOL English textbooks and worksheets.
+    return `You are a vocabulary extraction assistant for a Hong Kong primary school spelling practice app.
 
-CONTEXT: This image is from a Hong Kong kindergarten or primary school (ages 3-12) English learning material. A parent or teacher has marked specific vocabulary words with ${colorText} HIGHLIGHTER PEN for the child to practice spelling.
+CONTEXT: This image is from a Hong Kong kindergarten or primary school (ages 3-12) English textbook or worksheet. A parent/teacher has marked vocabulary words with ${colorText} HIGHLIGHTER PEN.
 
-YOUR TASK: Extract ONLY the words that are highlighted with ${colorText} highlighter.
+YOUR TASK: Extract ONLY the ${colorText} highlighted words that are REAL ENGLISH DICTIONARY WORDS.
 
-HOW TO IDENTIFY HIGHLIGHTED WORDS:
-- Look for words with bright ${colorText} background/overlay (semi-transparent highlighter color)
-- The highlighter color should be clearly visible on or around the text
-- Focus on words that have been deliberately marked
+CRITICAL RULES - READ CAREFULLY:
+1. ONLY output words you are 100% CERTAIN exist in an English dictionary
+2. If you're not sure if something is a real word, DO NOT include it
+3. Better to miss a word than to include garbage/nonsense
+4. Each word must be something a child could look up in a dictionary
 
-WHAT HIGHLIGHTED WORDS SHOULD LOOK LIKE:
-- Legitimate English vocabulary: apple, banana, family, school, happy, beautiful
-- Words a Hong Kong primary school student would learn
-- Real dictionary words that make sense
+EXAMPLES OF VALID WORDS (these exist in dictionaries):
+apple, banana, beautiful, family, school, teacher, happy, running, swimming, garden, flower, butterfly, rainbow, elephant, birthday, chocolate, delicious, wonderful, exciting, adventure
 
-WHAT TO SKIP (even if highlighted):
-- OCR errors or random letters (pas, lol, fos, tbe, wben)
-- Anything that doesn't look like a real English word
-- Chinese characters, numbers, or punctuation
-- If something looks like garbled text, skip it
+EXAMPLES OF INVALID OUTPUT (NEVER output these):
+- uit, ingi, artel, oria, tbe, wben, fos, pas (OCR errors/nonsense)
+- ing, tion, ness, ment (word fragments)
+- Single letters or 2-letter combinations
+
+HOW TO IDENTIFY ${colorText} HIGHLIGHTS:
+- Look for bright ${colorText} semi-transparent overlay on text
+- The highlight color should be clearly visible behind/around the word
 
 OUTPUT FORMAT:
-- List each highlighted word on its own line, wrapped with ** like **word**
-- Only include words you are confident are real English vocabulary
+- One word per line, wrapped with ** like **apple**
+- Maximum 20 words
+- Only include words you would bet money are real English words
 
-QUALITY CHECK: Before outputting each word, ask yourself: "Is this a real English word that would appear in a Hong Kong primary school textbook?" If no, skip it.
+FINAL CHECK: For each word, ask yourself: "Can I find this exact word in an English dictionary?" If NO or UNSURE, do not include it.
 
-If you cannot find any ${colorText} highlighted words, respond with:
+If no valid ${colorText} highlighted words found, respond with:
 NO_HIGHLIGHTED_WORDS_FOUND
 
-Now extract ONLY the ${colorText} highlighted vocabulary words from this image:`;
+Extract the ${colorText} highlighted vocabulary words:`;
   }
 
   // Smart mode - AI picks suitable spelling words
-  return `You are an OCR assistant helping extract spelling words from HONG KONG PRIMARY SCHOOL English textbooks and worksheets.
+  return `You are a vocabulary extraction assistant for a Hong Kong primary school spelling practice app.
 
-CONTEXT: This image is from a Hong Kong kindergarten or primary school (ages 3-12) English learning material. The app helps children practice spelling vocabulary words from their school curriculum.
+CONTEXT: This image is from a Hong Kong kindergarten or primary school (ages 3-12) English textbook or worksheet.
 
-YOUR TASK: Extract ONLY legitimate English vocabulary words that a Hong Kong primary school student would learn.
+YOUR TASK: Extract vocabulary words that are REAL ENGLISH DICTIONARY WORDS suitable for children to learn spelling.
 
-WHAT TO EXTRACT (examples of appropriate words):
-- Common nouns: apple, banana, cat, dog, family, school, teacher, friend, book, house, water, food
-- Action verbs: run, jump, play, eat, drink, sleep, read, write, swim, walk, help, like, love
-- Adjectives: big, small, happy, sad, good, bad, new, old, beautiful, wonderful, important
-- Colors: red, blue, green, yellow, pink, orange, purple, brown, black, white
-- Numbers written as words: one, two, three, four, five
-- Days/months: Monday, Tuesday, January, February
-- Body parts: head, hand, foot, eye, ear, nose, mouth
-- Weather: sunny, rainy, cloudy, hot, cold, warm
+CRITICAL RULES - READ CAREFULLY:
+1. ONLY output words you are 100% CERTAIN exist in an English dictionary
+2. If you're not sure if something is a real word, DO NOT include it
+3. Better to miss a word than to include garbage/nonsense
+4. Each word must be something a child could look up in a dictionary
+5. Focus on CONTENT words (nouns, verbs, adjectives) not function words
 
-WHAT TO SKIP (do NOT include):
-- OCR errors or random letters (pas, lol, fos, tbe, wben, oria)
-- Internet slang or abbreviations
-- Words that don't make sense
-- Very basic function words: the, a, an, is, are, to, of, in, for, on, at, by
-- Pronouns: I, you, he, she, it, we, they
-- Words shorter than 3 letters
-- Chinese characters, numbers, or punctuation
+EXAMPLES OF VALID WORDS TO EXTRACT:
+- Nouns: apple, banana, elephant, butterfly, birthday, family, school, teacher, garden, flower, rainbow, chocolate
+- Verbs: running, swimming, jumping, playing, eating, sleeping, reading, writing
+- Adjectives: beautiful, wonderful, exciting, delicious, happy, sad, big, small
+
+EXAMPLES OF INVALID OUTPUT (NEVER output these):
+- uit, ingi, artel, oria, tbe, wben, fos, pas, lol (OCR errors/nonsense)
+- ing, tion, ness, ment, ful, able (word fragments/suffixes only)
+- the, a, an, is, are, to, of, in, for, on (function words)
+- I, you, he, she, it, we, they (pronouns)
+- Single letters or 2-letter words
 
 OUTPUT FORMAT:
-- List each word on its own line
-- Mark important vocabulary words with ** like **apple**
-- Only output 10-30 high-quality words
-- If unsure whether something is a real word, DO NOT include it
+- One word per line, wrapped with ** like **apple**
+- Maximum 25 words
+- Only include words you would bet money are real English words
 
-QUALITY CHECK: Before outputting each word, ask yourself: "Would this word appear in a Hong Kong primary school English textbook?" If no, skip it.
+FINAL CHECK: For each word, ask yourself: "Can I find this exact word in an English dictionary? Is this a word a primary school student should learn to spell?" If NO or UNSURE to either question, do not include it.
 
-Now extract the vocabulary words from this image:`;
+Extract the vocabulary words from this image:`;
 }
 
 export async function POST(request: NextRequest) {
