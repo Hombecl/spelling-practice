@@ -191,6 +191,27 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Common OCR garbage and non-words to reject
+const GARBAGE_WORDS = new Set([
+  // OCR artifacts
+  'pas', 'lol', 'fos', 'tion', 'tbe', 'wben', 'bave', 'tben', 'witb',
+  'tbat', 'tbis', 'wbat', 'wbich', 'tbing', 'notbing', 'sometbing',
+  'oria', 'ing', 'ness', 'ment', 'ful', 'less', 'able', 'ible',
+  'pre', 'pro', 'con', 'dis', 'mis', 'non', 'sub', 'super',
+  // Internet slang (not suitable for kids)
+  'lmao', 'omg', 'wtf', 'btw', 'idk', 'imo', 'tbh', 'smh', 'fyi',
+  // Random letter combinations
+  'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff', 'ggg', 'hhh', 'iii',
+  'jjj', 'kkk', 'lll', 'mmm', 'nnn', 'ooo', 'ppp', 'qqq', 'rrr',
+  'sss', 'ttt', 'uuu', 'vvv', 'www', 'xxx', 'yyy', 'zzz',
+  // Common OCR errors that look like words
+  'tlie', 'liave', 'wlien', 'tliat', 'tliis', 'wliat', 'wliich',
+  'rhe', 'ehe', 'che', 'dhe', 'fhe', 'ghe', 'hhe', 'jhe', 'khe',
+  // Short meaningless combinations
+  'ack', 'eck', 'ick', 'ock', 'uck', 'ank', 'enk', 'ink', 'onk', 'unk',
+  'ast', 'est', 'ist', 'ost', 'ust', 'aft', 'eft', 'ift', 'oft', 'uft',
+]);
+
 // Check if a word looks like a valid English word
 function isValidEnglishWord(word: string): boolean {
   // Must be at least 3 characters (skip 2-letter words like "ey")
@@ -202,6 +223,9 @@ function isValidEnglishWord(word: string): boolean {
   // Must have at least one vowel
   if (!/[aeiou]/i.test(word)) return false;
 
+  // Check against known garbage words
+  if (GARBAGE_WORDS.has(word.toLowerCase())) return false;
+
   // Skip words that are just vowels or consonants repeated
   if (/^(.)\1+$/.test(word)) return false;
 
@@ -212,15 +236,14 @@ function isValidEnglishWord(word: string): boolean {
   if (/[aeiou]{4,}/i.test(word)) return false;
 
   // Common OCR garbage patterns to skip
-  const garbagePatterns = [
-    /^[aeiou]{2,3}$/i,  // Just 2-3 vowels like "ey", "oa", "ia"
-    /^[bcdfghjklmnpqrstvwxyz]{2,3}$/i,  // Just consonants
-    /^.{1,2}$/,  // 1-2 character "words"
-  ];
+  if (/^[aeiou]{2,3}$/i.test(word)) return false;  // Just 2-3 vowels like "ey", "oa"
+  if (/^[bcdfghjklmnpqrstvwxyz]{2,3}$/i.test(word)) return false;  // Just consonants
 
-  for (const pattern of garbagePatterns) {
-    if (pattern.test(word)) return false;
-  }
+  // Skip words that look like suffixes/prefixes only
+  if (/^(un|re|de|pre|pro|anti|dis|mis|non|sub|super|over|under|out|up|down|fore|post|mid|semi|self|co|ex|bi|tri|multi|poly|mono|uni|omni|pan|auto|pseudo|neo|proto|meta|para|ultra|infra|intra|inter|trans|extra|hyper|hypo)$/i.test(word)) return false;
+
+  // Skip words that are just common suffixes
+  if (/^(ing|tion|sion|ness|ment|able|ible|ful|less|ous|ive|al|ly|er|est|ed|en|ity|ty|ry|ary|ory|ery)$/i.test(word)) return false;
 
   return true;
 }
