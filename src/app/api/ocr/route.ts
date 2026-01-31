@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Replicate API endpoint for DeepSeek OCR
-const REPLICATE_API_URL = 'https://api.replicate.com/v1/predictions';
+// OpenRouter API endpoint (OpenAI-compatible)
+const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-interface ReplicateResponse {
-  id: string;
-  status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
-  output?: string;
-  error?: string;
-}
+// Gemini 2.5 Flash Lite - cheapest vision model (~$0.10/1M input tokens)
+const MODEL = 'google/gemini-2.5-flash-lite-preview';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,94 +14,84 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Image is required' }, { status: 400 });
     }
 
-    const apiKey = process.env.REPLICATE_API_KEY;
+    const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'REPLICATE_API_KEY not configured', useLocalOCR: true },
+        { error: 'OPENROUTER_API_KEY not configured', useLocalOCR: true },
         { status: 500 }
       );
     }
 
-    // Create prediction with DeepSeek OCR
-    const createResponse = await fetch(REPLICATE_API_URL, {
+    // Call OpenRouter with Gemini Flash Lite for OCR
+    const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'Prefer': 'wait', // Wait for result instead of polling
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://spelling-practice.vercel.app',
+        'X-Title': 'Spelling Practice OCR',
       },
       body: JSON.stringify({
-        // DeepSeek OCR model on Replicate
-        version: 'lucataco/deepseek-ocr:latest',
-        input: {
-          image: image, // base64 data URL or URL
-          task_type: 'Free OCR', // Just extract text, no markdown conversion needed
-          resolution_size: 'Base', // Good balance of speed and quality
-        },
+        model: MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'image_url',
+                image_url: {
+                  url: image, // base64 data URL
+                },
+              },
+              {
+                type: 'text',
+                text: `You are an OCR assistant for a children's spelling practice app. Extract ALL English words from this image.
+
+IMPORTANT INSTRUCTIONS:
+1. List EVERY English word you can see, one per line
+2. If you see words that are HIGHLIGHTED (with yellow, pink, green, or any color highlighter), mark them with ** on both sides like **word**
+3. Include words from sentences, lists, vocabulary sections, etc.
+4. Ignore Chinese characters, numbers, and punctuation
+5. Keep the original spelling (don't correct typos)
+
+Example output format:
+apple
+**banana**
+cat
+**dog**
+elephant
+
+Now extract all words from the image:`,
+              },
+            ],
+          },
+        ],
+        max_tokens: 2000,
+        temperature: 0,
       }),
     });
 
-    if (!createResponse.ok) {
-      const errorText = await createResponse.text();
-      console.error('Replicate API error:', errorText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenRouter API error:', errorText);
       return NextResponse.json(
-        { error: 'Failed to create OCR prediction', useLocalOCR: true },
+        { error: 'Failed to process image', useLocalOCR: true },
         { status: 500 }
       );
     }
 
-    let result: ReplicateResponse = await createResponse.json();
+    const result = await response.json();
+    const rawText = result.choices?.[0]?.message?.content || '';
 
-    // If not using "Prefer: wait", poll for completion
-    if (result.status !== 'succeeded' && result.status !== 'failed') {
-      // Poll for result (max 60 seconds)
-      const maxAttempts = 30;
-      let attempts = 0;
-
-      while (attempts < maxAttempts && result.status !== 'succeeded' && result.status !== 'failed') {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
-
-        const pollResponse = await fetch(`${REPLICATE_API_URL}/${result.id}`, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-          },
-        });
-
-        if (!pollResponse.ok) {
-          throw new Error('Failed to poll OCR status');
-        }
-
-        result = await pollResponse.json();
-        attempts++;
-      }
-    }
-
-    if (result.status === 'failed') {
-      console.error('DeepSeek OCR failed:', result.error);
-      return NextResponse.json(
-        { error: result.error || 'OCR processing failed', useLocalOCR: true },
-        { status: 500 }
-      );
-    }
-
-    if (result.status !== 'succeeded' || !result.output) {
-      return NextResponse.json(
-        { error: 'OCR timeout', useLocalOCR: true },
-        { status: 500 }
-      );
-    }
-
-    // Parse the OCR output to extract words
-    const rawText = result.output;
-    const words = extractEnglishWords(rawText);
-    const highlightedWords = detectHighlightedWords(rawText);
+    // Parse the response to extract words
+    const { words, highlightedWords } = parseOCRResponse(rawText);
 
     return NextResponse.json({
       success: true,
       words,
       highlightedWords,
       rawText,
-      source: 'deepseek-ocr',
+      source: 'gemini-ocr',
     });
   } catch (error) {
     console.error('OCR API error:', error);
@@ -116,12 +102,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Extract clean English words from OCR text
-function extractEnglishWords(text: string): string[] {
-  // Split by whitespace, newlines, and common delimiters
-  const tokens = text.split(/[\s\n\r,;:!?()[\]{}""''""]+/);
-
+// Parse the OCR response to extract words and highlighted words
+function parseOCRResponse(text: string): { words: string[]; highlightedWords: string[] } {
   const words: string[] = [];
+  const highlightedWords: string[] = [];
   const seen = new Set<string>();
 
   // Common stop words to skip
@@ -139,64 +123,47 @@ function extractEnglishWords(text: string): string[] {
     'very', 'just', 'also', 'now', 'only', 'then', 'about', 'into',
   ]);
 
-  for (const token of tokens) {
-    // Remove punctuation from start/end
-    let cleaned = token.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '');
+  // Split by lines and process each
+  const lines = text.split(/[\n\r]+/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check if it's a highlighted word (marked with **)
+    const isHighlighted = trimmed.startsWith('**') && trimmed.endsWith('**');
+
+    // Extract the word
+    let word = trimmed.replace(/^\*\*|\*\*$/g, '').trim();
+
+    // Clean the word - remove punctuation, numbers, etc.
+    word = word.replace(/^[^a-zA-Z]+|[^a-zA-Z]+$/g, '');
 
     // Skip if empty or too short
-    if (cleaned.length < 2) continue;
+    if (word.length < 2) continue;
 
-    // Skip if contains numbers
-    if (/\d/.test(cleaned)) continue;
-
-    // Skip if contains non-English characters
-    if (/[^\x00-\x7F]/.test(cleaned)) continue;
+    // Skip if contains numbers or non-ASCII
+    if (/\d/.test(word) || /[^\x00-\x7F]/.test(word)) continue;
 
     // Convert to lowercase
-    cleaned = cleaned.toLowerCase();
+    word = word.toLowerCase();
 
     // Skip stop words
-    if (skipWords.has(cleaned)) continue;
+    if (skipWords.has(word)) continue;
 
     // Skip if already seen
-    if (seen.has(cleaned)) continue;
+    if (seen.has(word)) continue;
 
     // Must have at least one vowel
-    if (!/[aeiou]/.test(cleaned)) continue;
+    if (!/[aeiou]/.test(word)) continue;
 
-    seen.add(cleaned);
-    words.push(cleaned);
-  }
+    seen.add(word);
+    words.push(word);
 
-  return words;
-}
-
-// Detect words that might be highlighted (DeepSeek OCR may indicate this in output)
-// This is a placeholder - DeepSeek OCR doesn't directly detect highlights
-// But we can look for patterns like **bold**, ==highlight==, or specific formatting
-function detectHighlightedWords(text: string): string[] {
-  const highlighted: string[] = [];
-
-  // Look for markdown-style highlights: ==word== or **word**
-  const highlightPatterns = [
-    /==([^=]+)==/g,           // ==highlighted==
-    /\*\*([^*]+)\*\*/g,       // **bold**
-    /\[\[([^\]]+)\]\]/g,      // [[marked]]
-    /<mark>([^<]+)<\/mark>/g, // <mark>highlighted</mark>
-  ];
-
-  for (const pattern of highlightPatterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const words = match[1].split(/\s+/);
-      for (const word of words) {
-        const cleaned = word.replace(/[^a-zA-Z]/g, '').toLowerCase();
-        if (cleaned.length >= 2 && !highlighted.includes(cleaned)) {
-          highlighted.push(cleaned);
-        }
-      }
+    if (isHighlighted) {
+      highlightedWords.push(word);
     }
   }
 
-  return highlighted;
+  return { words, highlightedWords };
 }

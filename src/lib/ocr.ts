@@ -1,4 +1,4 @@
-// OCR utilities - supports DeepSeek OCR (via Replicate) with Tesseract.js fallback
+// OCR utilities - supports Gemini Vision (via OpenRouter) with Tesseract.js fallback
 import Tesseract from 'tesseract.js';
 
 export interface OCRResult {
@@ -8,11 +8,11 @@ export interface OCRResult {
   rawText: string;
   confidence: number;
   error?: string;
-  source?: 'deepseek-ocr' | 'tesseract';
+  source?: 'gemini-ocr' | 'tesseract';
 }
 
-// DeepSeek OCR API response type
-interface DeepSeekOCRResponse {
+// Gemini OCR API response type
+interface GeminiOCRResponse {
   success: boolean;
   words: string[];
   highlightedWords: string[];
@@ -190,8 +190,8 @@ async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-// Try DeepSeek OCR via our API route
-async function tryDeepSeekOCR(
+// Try Gemini OCR via our API route (OpenRouter)
+async function tryGeminiOCR(
   imageSource: File | string,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult | null> {
@@ -216,11 +216,11 @@ async function tryDeepSeekOCR(
 
     onProgress?.(80);
 
-    const data: DeepSeekOCRResponse = await response.json();
+    const data: GeminiOCRResponse = await response.json();
 
     // If API says to use local OCR, return null to trigger fallback
     if (data.useLocalOCR || !response.ok) {
-      console.log('[OCR] DeepSeek OCR unavailable, falling back to Tesseract');
+      console.log('[OCR] Gemini OCR unavailable, falling back to Tesseract');
       return null;
     }
 
@@ -231,25 +231,25 @@ async function tryDeepSeekOCR(
       words: data.words || [],
       highlightedWords: data.highlightedWords || [],
       rawText: data.rawText || '',
-      confidence: 95, // DeepSeek OCR is generally very accurate
-      source: 'deepseek-ocr',
+      confidence: 95, // Gemini Vision is generally very accurate
+      source: 'gemini-ocr',
     };
   } catch (error) {
-    console.log('[OCR] DeepSeek OCR failed, falling back to Tesseract:', error);
+    console.log('[OCR] Gemini OCR failed, falling back to Tesseract:', error);
     return null;
   }
 }
 
 // Extract English words from an image with highlight detection
-// Tries DeepSeek OCR first, falls back to Tesseract.js
+// Tries Gemini OCR first, falls back to Tesseract.js
 export async function extractWordsFromImage(
   imageSource: File | string,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> {
-  // Try DeepSeek OCR first (better accuracy)
-  const deepSeekResult = await tryDeepSeekOCR(imageSource, onProgress);
-  if (deepSeekResult) {
-    return deepSeekResult;
+  // Try Gemini OCR first (better accuracy, can detect highlights)
+  const geminiResult = await tryGeminiOCR(imageSource, onProgress);
+  if (geminiResult) {
+    return geminiResult;
   }
 
   // Fallback to Tesseract.js (local, no API key needed)
