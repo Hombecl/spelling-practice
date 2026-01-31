@@ -14,6 +14,26 @@ const ENDING_BLENDS = ['ck', 'ff', 'll', 'ng', 'nk', 'ss', 'zz', 'tch', 'dge'];
 const VOWEL_TEAMS = ['ai', 'ay', 'ea', 'ee', 'ie', 'oa', 'oe', 'oo', 'ou', 'ow', 'ue', 'ui', 'ey', 'au', 'aw', 'ew'];
 const VOWELS = ['a', 'e', 'i', 'o', 'u'];
 
+// Common English suffixes (should be kept as separate syllables)
+const SUFFIXES = [
+  'ing', 'ed', 'er', 'est', 'ly', 'ness', 'ment', 'ful', 'less',
+  'tion', 'sion', 'ous', 'ious', 'eous', 'able', 'ible', 'al', 'ial',
+  'ive', 'ative', 'itive', 'ure', 'ture', 'sure',
+  'ity', 'ty', 'ry', 'ary', 'ory', 'ery',
+  'ist', 'ism', 'ize', 'ise', 'en', 'ern',
+  'dom', 'hood', 'ship', 'ward', 'wise',
+  'ling', 'let', 'ette', 'ish', 'like',
+  'ous', 'eous', 'ious', 'ant', 'ent', 'ance', 'ence',
+];
+
+// Common English prefixes
+const PREFIXES = [
+  'un', 're', 'pre', 'dis', 'mis', 'non', 'over', 'under',
+  'sub', 'super', 'semi', 'anti', 'mid', 'inter', 'fore',
+  'de', 'trans', 'ex', 'extra', 'pro', 'con', 'com',
+  'en', 'em', 'in', 'im', 'il', 'ir',
+];
+
 // Phonics rules mapping
 const SOUND_MAP: Record<string, string> = {
   // Consonant blends
@@ -66,60 +86,137 @@ function countSyllables(word: string): number {
   return Math.max(1, count);
 }
 
-// Break word into syllables (simplified)
+// Break word into syllables using morpheme-aware algorithm
 function breakIntoSyllables(word: string): string[] {
   const w = word.toLowerCase();
-  const syllableCount = countSyllables(w);
 
-  if (syllableCount === 1) {
+  if (w.length <= 3) {
     return [w];
   }
 
-  // Simple syllable breaking rules
+  // Step 1: Identify and separate suffixes first
+  let remaining = w;
+  const suffixParts: string[] = [];
+
+  // Sort suffixes by length (longest first) to match correctly
+  const sortedSuffixes = [...SUFFIXES].sort((a, b) => b.length - a.length);
+
+  // Try to find suffixes (can have multiple, e.g., "hopelessness" = hope + less + ness)
+  let foundSuffix = true;
+  while (foundSuffix && remaining.length > 2) {
+    foundSuffix = false;
+    for (const suffix of sortedSuffixes) {
+      if (remaining.endsWith(suffix) && remaining.length > suffix.length + 1) {
+        // Check if removing suffix leaves a valid stem (has a vowel)
+        const stem = remaining.slice(0, -suffix.length);
+        if (stem.length >= 2 && /[aeiou]/.test(stem)) {
+          suffixParts.unshift(suffix);
+          remaining = stem;
+          foundSuffix = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Step 2: Identify and separate prefixes
+  const prefixParts: string[] = [];
+  const sortedPrefixes = [...PREFIXES].sort((a, b) => b.length - a.length);
+
+  let foundPrefix = true;
+  while (foundPrefix && remaining.length > 2) {
+    foundPrefix = false;
+    for (const prefix of sortedPrefixes) {
+      if (remaining.startsWith(prefix) && remaining.length > prefix.length + 1) {
+        // Check if removing prefix leaves a valid stem
+        const stem = remaining.slice(prefix.length);
+        if (stem.length >= 2 && /[aeiou]/.test(stem)) {
+          prefixParts.push(prefix);
+          remaining = stem;
+          foundPrefix = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Step 3: Break the remaining root into syllables
+  const rootSyllables = breakRootIntoSyllables(remaining);
+
+  // Step 4: Combine all parts
+  return [...prefixParts, ...rootSyllables, ...suffixParts];
+}
+
+// Break a root word (without affixes) into syllables
+function breakRootIntoSyllables(word: string): string[] {
+  if (word.length <= 3) {
+    return [word];
+  }
+
   const syllables: string[] = [];
   let current = '';
+  let i = 0;
 
-  for (let i = 0; i < w.length; i++) {
-    current += w[i];
+  while (i < word.length) {
+    current += word[i];
 
-    // Check if we should break
-    if (i < w.length - 2) {
-      const curr = w[i];
-      const next = w[i + 1];
-      const afterNext = w[i + 2];
+    // Check if we're at a syllable boundary
+    if (i < word.length - 1) {
+      const curr = word[i];
+      const next = word[i + 1];
+      const afterNext = i < word.length - 2 ? word[i + 2] : '';
 
-      // V/CV pattern (break before consonant)
-      if (VOWELS.includes(curr) && !VOWELS.includes(next) && VOWELS.includes(afterNext)) {
-        syllables.push(current);
-        current = '';
+      // Check for vowel team - don't break in the middle
+      const twoChars = curr + next;
+      if (VOWEL_TEAMS.includes(twoChars)) {
+        current += next;
+        i += 2;
+        continue;
       }
-      // VC/CV pattern (break between consonants)
-      else if (!VOWELS.includes(curr) && !VOWELS.includes(next) && i > 0 && VOWELS.includes(w[i - 1])) {
-        // Keep consonant blends together
-        const blend = curr + next;
+
+      // Rule 1: VCV - break before the consonant (o-pen, e-ven)
+      if (VOWELS.includes(curr) && !VOWELS.includes(next) && VOWELS.includes(afterNext)) {
+        // But check if the consonant + next vowel forms a blend
+        const blend = next + afterNext;
         if (!CONSONANT_BLENDS.includes(blend)) {
           syllables.push(current);
           current = '';
         }
       }
+      // Rule 2: VCCV - break between consonants (hap-py, let-ter)
+      else if (
+        VOWELS.includes(curr) === false &&
+        VOWELS.includes(next) === false &&
+        i > 0 &&
+        VOWELS.includes(word[i - 1])
+      ) {
+        // Keep consonant blends together
+        const blend = curr + next;
+        if (!CONSONANT_BLENDS.includes(blend) && !ENDING_BLENDS.includes(blend)) {
+          syllables.push(current);
+          current = '';
+        }
+      }
     }
+
+    i++;
   }
 
   if (current) {
     syllables.push(current);
   }
 
-  // If we got too many or too few, just split evenly
-  if (syllables.length !== syllableCount && syllableCount > 1) {
-    const chunkSize = Math.ceil(w.length / syllableCount);
-    const evenSyllables: string[] = [];
-    for (let i = 0; i < w.length; i += chunkSize) {
-      evenSyllables.push(w.slice(i, i + chunkSize));
+  // Merge very short syllables
+  const merged: string[] = [];
+  for (const syl of syllables) {
+    if (merged.length > 0 && (syl.length === 1 || merged[merged.length - 1].length === 1)) {
+      merged[merged.length - 1] += syl;
+    } else {
+      merged.push(syl);
     }
-    return evenSyllables;
   }
 
-  return syllables;
+  return merged.length > 0 ? merged : [word];
 }
 
 // Identify phonics sounds in a word

@@ -13,8 +13,10 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [progress, setProgress] = useState(0);
   const [preview, setPreview] = useState<string | null>(null);
   const [extractedWords, setExtractedWords] = useState<string[]>([]);
+  const [highlightedWords, setHighlightedWords] = useState<Set<string>>(new Set());
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,9 +42,19 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     if (result.success) {
       // Filter to valid words
       const validWords = result.words.filter(isValidEnglishWord);
+      const validHighlighted = result.highlightedWords.filter(isValidEnglishWord);
+
       setExtractedWords(validWords);
-      // Select all by default
-      setSelectedWords(new Set(validWords));
+      setHighlightedWords(new Set(validHighlighted));
+
+      // If highlighted words found, select only those by default
+      if (validHighlighted.length > 0) {
+        setSelectedWords(new Set(validHighlighted));
+        setFilterMode('highlighted');
+      } else {
+        setSelectedWords(new Set(validWords));
+        setFilterMode('all');
+      }
     } else {
       setError(result.error || 'OCR 處理失敗');
     }
@@ -59,12 +71,29 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   };
 
   const selectAll = () => {
-    setSelectedWords(new Set(extractedWords));
+    const wordsToSelect = filterMode === 'highlighted'
+      ? extractedWords.filter(w => highlightedWords.has(w))
+      : extractedWords;
+    setSelectedWords(new Set(wordsToSelect));
   };
 
   const selectNone = () => {
     setSelectedWords(new Set());
   };
+
+  const selectHighlightedOnly = () => {
+    setSelectedWords(new Set(highlightedWords));
+    setFilterMode('highlighted');
+  };
+
+  const showAllWords = () => {
+    setFilterMode('all');
+  };
+
+  // Get words to display based on filter mode
+  const displayedWords = filterMode === 'highlighted'
+    ? extractedWords.filter(w => highlightedWords.has(w))
+    : extractedWords;
 
   const handleConfirm = () => {
     const words = Array.from(selectedWords);
@@ -172,10 +201,45 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 />
               </div>
 
+              {/* Highlight Detection Notice */}
+              {highlightedWords.size > 0 && (
+                <div className="mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-xl">
+                  <p className="text-sm text-yellow-800">
+                    🖍️ 偵測到 <span className="font-bold">{highlightedWords.size}</span> 個螢光筆標記嘅字！
+                  </p>
+                </div>
+              )}
+
+              {/* Filter Tabs */}
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={showAllWords}
+                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
+                    filterMode === 'all'
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  全部 ({extractedWords.length})
+                </button>
+                {highlightedWords.size > 0 && (
+                  <button
+                    onClick={selectHighlightedOnly}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
+                      filterMode === 'highlighted'
+                        ? 'bg-yellow-500 text-white'
+                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                    }`}
+                  >
+                    🖍️ 標記咗 ({highlightedWords.size})
+                  </button>
+                )}
+              </div>
+
               {/* Word Count */}
               <div className="flex items-center justify-between mb-3">
-                <p className="text-gray-600">
-                  搵到 <span className="font-bold text-green-600">{extractedWords.length}</span> 個英文字
+                <p className="text-gray-600 text-sm">
+                  顯示緊 <span className="font-bold text-green-600">{displayedWords.length}</span> 個字
                 </p>
                 <div className="flex gap-2">
                   <button
@@ -188,25 +252,32 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                     onClick={selectNone}
                     className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded"
                   >
-                    取消全選
+                    取消
                   </button>
                 </div>
               </div>
 
               {/* Word List */}
               <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-xl">
-                {extractedWords.map((word) => (
+                {displayedWords.map((word) => (
                   <button
                     key={word}
                     onClick={() => toggleWord(word)}
                     className={`
-                      px-3 py-2 rounded-lg font-bold transition-all
+                      px-3 py-2 rounded-lg font-bold transition-all relative
                       ${selectedWords.has(word)
                         ? 'bg-green-500 text-white'
                         : 'bg-white border-2 border-gray-300 text-gray-600'
                       }
+                      ${highlightedWords.has(word) && !selectedWords.has(word)
+                        ? 'border-yellow-400 bg-yellow-50'
+                        : ''
+                      }
                     `}
                   >
+                    {highlightedWords.has(word) && (
+                      <span className="absolute -top-1 -right-1 text-xs">🖍️</span>
+                    )}
                     {word}
                   </button>
                 ))}
