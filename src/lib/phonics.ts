@@ -526,3 +526,134 @@ export async function speakSyllables(word: string, onSyllable?: (index: number) 
 export function getSyllables(word: string): string[] {
   return breakIntoSyllables(word);
 }
+
+// Find which syllable contains a given letter index
+export function getSyllableAtIndex(word: string, letterIndex: number): { syllable: string; syllableIndex: number; positionInSyllable: number } | null {
+  const syllables = breakIntoSyllables(word);
+  let currentPos = 0;
+
+  for (let i = 0; i < syllables.length; i++) {
+    const syllable = syllables[i];
+    const syllableStart = currentPos;
+    const syllableEnd = currentPos + syllable.length;
+
+    if (letterIndex >= syllableStart && letterIndex < syllableEnd) {
+      return {
+        syllable,
+        syllableIndex: i,
+        positionInSyllable: letterIndex - syllableStart,
+      };
+    }
+    currentPos = syllableEnd;
+  }
+  return null;
+}
+
+// Get phonics hint for a specific letter position
+// Instead of just saying the letter, we say the sound of the syllable containing that letter
+export function getPhonicsHintForPosition(word: string, letterIndex: number): {
+  syllable: string;
+  pronunciation: string;
+  hintText: string;
+  syllableIndex: number;
+} | null {
+  const syllableInfo = getSyllableAtIndex(word, letterIndex);
+  if (!syllableInfo) return null;
+
+  const pronunciation = getSyllablePronunciation(syllableInfo.syllable);
+
+  return {
+    syllable: syllableInfo.syllable,
+    pronunciation,
+    hintText: `聽吓呢個音：「${syllableInfo.syllable}」`,
+    syllableIndex: syllableInfo.syllableIndex,
+  };
+}
+
+// Speak the phonics hint (syllable sound) for a letter position
+export async function speakPhonicsHint(word: string, letterIndex: number): Promise<void> {
+  const hint = getPhonicsHintForPosition(word, letterIndex);
+  if (!hint) return;
+
+  return new Promise<void>((resolve) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      setTimeout(resolve, 500);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(hint.pronunciation);
+    utterance.rate = 0.5; // Slower for hint
+    utterance.pitch = 1;
+    utterance.lang = 'en-US';
+
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+// Get all letter-to-sound mappings for a word
+// This helps show children how each letter contributes to the sound
+export function getLetterSoundMapping(word: string): Array<{
+  letter: string;
+  letterIndex: number;
+  syllable: string;
+  syllableIndex: number;
+  isPartOfBlend: boolean;
+  blendType?: string;
+}> {
+  const syllables = breakIntoSyllables(word);
+  const mapping: Array<{
+    letter: string;
+    letterIndex: number;
+    syllable: string;
+    syllableIndex: number;
+    isPartOfBlend: boolean;
+    blendType?: string;
+  }> = [];
+
+  let letterIndex = 0;
+
+  for (let syllableIndex = 0; syllableIndex < syllables.length; syllableIndex++) {
+    const syllable = syllables[syllableIndex];
+
+    for (let i = 0; i < syllable.length; i++) {
+      const letter = syllable[i];
+
+      // Check if this letter is part of a blend
+      let isPartOfBlend = false;
+      let blendType: string | undefined;
+
+      // Check for 2-letter blends
+      if (i < syllable.length - 1) {
+        const twoLetters = syllable.slice(i, i + 2);
+        if (CONSONANT_BLENDS.includes(twoLetters) || VOWEL_TEAMS.includes(twoLetters)) {
+          isPartOfBlend = true;
+          blendType = VOWEL_TEAMS.includes(twoLetters) ? 'vowel-team' : 'consonant-blend';
+        }
+      }
+      // Check if previous letter started a blend
+      if (i > 0) {
+        const twoLetters = syllable.slice(i - 1, i + 1);
+        if (CONSONANT_BLENDS.includes(twoLetters) || VOWEL_TEAMS.includes(twoLetters)) {
+          isPartOfBlend = true;
+          blendType = VOWEL_TEAMS.includes(twoLetters) ? 'vowel-team' : 'consonant-blend';
+        }
+      }
+
+      mapping.push({
+        letter,
+        letterIndex,
+        syllable,
+        syllableIndex,
+        isPartOfBlend,
+        blendType,
+      });
+
+      letterIndex++;
+    }
+  }
+
+  return mapping;
+}

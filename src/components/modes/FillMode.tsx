@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Word, shuffleArray } from '@/lib/words';
-import { speakEncouragement, speakTryAgain, speakLetter, speakWord } from '@/lib/speech';
+import { speakEncouragement, speakTryAgain, speakWord } from '@/lib/speech';
+import { speakPhonicsHint, getPhonicsHintForPosition, getSyllables } from '@/lib/phonics';
 import LetterButton from '@/components/LetterButton';
 import SpeakButton from '@/components/SpeakButton';
 import StarBurst from '@/components/StarBurst';
@@ -30,6 +31,7 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
   const [isCooldown, setIsCooldown] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showPhonics, setShowPhonics] = useState(false);
+  const [currentHint, setCurrentHint] = useState<{ syllable: string; syllableIndex: number } | null>(null);
 
   // Reveal some letters based on word length
   const generateRevealedIndices = useCallback(() => {
@@ -151,10 +153,16 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
     }
   };
 
-  const handleHint = () => {
+  // Phonics-based hint: speak the syllable sound instead of the letter
+  const handleHint = async () => {
     if (currentIndex >= 0) {
-      const letter = word.word[currentIndex];
-      speakLetter(letter);
+      const hint = getPhonicsHintForPosition(word.word, currentIndex);
+      if (hint) {
+        setCurrentHint({ syllable: hint.syllable, syllableIndex: hint.syllableIndex });
+        await speakPhonicsHint(word.word, currentIndex);
+        // Clear hint highlight after 2 seconds
+        setTimeout(() => setCurrentHint(null), 2000);
+      }
     }
   };
 
@@ -237,11 +245,33 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
         ))}
       </div>
 
-      {/* Instructions */}
+      {/* Syllable Display for Phonics Hints */}
       {!showReset && currentIndex >= 0 && (
-        <p className="text-sm text-gray-500">
-          填第 {currentIndex + 1} 個字母
-        </p>
+        <div className="text-center">
+          <p className="text-sm text-gray-500 mb-2">
+            填第 {currentIndex + 1} 個字母
+          </p>
+          {/* Show syllables with current one highlighted */}
+          <div className="flex gap-2 justify-center items-center flex-wrap">
+            {getSyllables(word.word).map((syllable, idx) => (
+              <span
+                key={idx}
+                className={`px-3 py-1 rounded-lg text-sm font-bold transition-all ${
+                  currentHint?.syllableIndex === idx
+                    ? 'bg-purple-500 text-white scale-110 ring-2 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {syllable}
+              </span>
+            ))}
+          </div>
+          {currentHint && (
+            <p className="text-purple-600 text-sm mt-2 animate-pulse">
+              🔊 聽：「{currentHint.syllable}」
+            </p>
+          )}
+        </div>
       )}
 
       {/* Reset Warning */}

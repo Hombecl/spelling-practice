@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Word } from '@/lib/words';
-import { speakEncouragement, speakTryAgain, speakSpelling, speakWord } from '@/lib/speech';
+import { speakEncouragement, speakTryAgain, speakWord } from '@/lib/speech';
+import { speakPhonicsHint, getPhonicsHintForPosition, getSyllables, speakSyllables } from '@/lib/phonics';
 import SpeakButton from '@/components/SpeakButton';
 import WordDisplay from '@/components/WordDisplay';
 import StarBurst from '@/components/StarBurst';
@@ -28,6 +29,8 @@ export default function SpellMode({ word, onComplete, onSkip }: SpellModeProps) 
   const [isCooldown, setIsCooldown] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showPhonics, setShowPhonics] = useState(false);
+  const [currentHint, setCurrentHint] = useState<{ syllable: string; syllableIndex: number } | null>(null);
+  const [activeSyllable, setActiveSyllable] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Reset the current word
@@ -132,8 +135,22 @@ export default function SpellMode({ word, onComplete, onSkip }: SpellModeProps) 
     inputRef.current?.focus();
   };
 
-  const handleSpellingHint = () => {
-    speakSpelling(word.word);
+  // Phonics-based hint: speak the syllable sound for current position
+  const handlePhonicsHint = async () => {
+    const hint = getPhonicsHintForPosition(word.word, currentIndex);
+    if (hint) {
+      setCurrentHint({ syllable: hint.syllable, syllableIndex: hint.syllableIndex });
+      await speakPhonicsHint(word.word, currentIndex);
+      setTimeout(() => setCurrentHint(null), 2000);
+    }
+  };
+
+  // Speak all syllables one by one
+  const handleSyllablesHint = async () => {
+    await speakSyllables(word.word, (index) => {
+      setActiveSyllable(index);
+    });
+    setActiveSyllable(-1);
   };
 
   const revealedLetters = word.word.split('').map(() => false);
@@ -273,14 +290,48 @@ export default function SpellMode({ word, onComplete, onSkip }: SpellModeProps) 
         </div>
       )}
 
+      {/* Syllable Display with Hints */}
+      {!showReset && (
+        <div className="w-full max-w-md text-center">
+          <div className="flex gap-2 justify-center items-center flex-wrap mb-2">
+            {getSyllables(word.word).map((syllable, idx) => (
+              <span
+                key={idx}
+                className={`px-3 py-1 rounded-lg text-sm font-bold transition-all ${
+                  activeSyllable === idx
+                    ? 'bg-yellow-400 text-yellow-900 scale-110'
+                    : currentHint?.syllableIndex === idx
+                    ? 'bg-purple-500 text-white scale-110 ring-2 ring-purple-300'
+                    : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                {syllable}
+              </span>
+            ))}
+          </div>
+          {currentHint && (
+            <p className="text-purple-600 text-sm animate-pulse">
+              🔊 聽：「{currentHint.syllable}」
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Hint and Skip Buttons */}
-      <div className="flex gap-4 mt-2">
+      <div className="flex gap-3 mt-2 flex-wrap justify-center">
         <button
-          onClick={handleSpellingHint}
+          onClick={handlePhonicsHint}
           disabled={showReset}
           className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 active:scale-95 disabled:opacity-50"
         >
-          🔤 聽拼法
+          💡 音節提示
+        </button>
+        <button
+          onClick={handleSyllablesHint}
+          disabled={showReset}
+          className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 active:scale-95 disabled:opacity-50"
+        >
+          🔊 聽音節
         </button>
         <button
           onClick={onSkip}
