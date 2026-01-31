@@ -457,10 +457,15 @@ function extractEnglishWords(text: string): string[] {
 
 // Common OCR garbage and non-words to reject
 const GARBAGE_WORDS = new Set([
-  // OCR artifacts
-  'pas', 'lol', 'fos', 'tion', 'tbe', 'wben', 'bave', 'tben', 'witb',
-  'tbat', 'tbis', 'wbat', 'wbich', 'tbing', 'notbing', 'sometbing',
-  'oria', 'ing', 'ness', 'ment', 'ful', 'less', 'able', 'ible',
+  // Known OCR errors from testing - MUST MATCH route.ts
+  'uit', 'ingi', 'artel', 'oria', 'pas', 'fos', 'lol',
+  // OCR artifacts - 'h' misread as 'b' or 'li'
+  'tbe', 'wben', 'bave', 'tben', 'witb', 'tbat', 'tbis', 'wbat', 'wbich',
+  'tbing', 'notbing', 'sometbing', 'tlie', 'liave', 'wlien', 'tliat',
+  'tliis', 'wliat', 'wliich',
+  // Word fragments / suffixes / prefixes alone
+  'ing', 'tion', 'sion', 'ness', 'ment', 'ful', 'less', 'able', 'ible',
+  'ous', 'ive', 'ary', 'ory', 'ery', 'ity',
   'pre', 'pro', 'con', 'dis', 'mis', 'non', 'sub', 'super',
   // Internet slang (not suitable for kids)
   'lmao', 'omg', 'wtf', 'btw', 'idk', 'imo', 'tbh', 'smh', 'fyi',
@@ -468,16 +473,29 @@ const GARBAGE_WORDS = new Set([
   'aaa', 'bbb', 'ccc', 'ddd', 'eee', 'fff', 'ggg', 'hhh', 'iii',
   'jjj', 'kkk', 'lll', 'mmm', 'nnn', 'ooo', 'ppp', 'qqq', 'rrr',
   'sss', 'ttt', 'uuu', 'vvv', 'www', 'xxx', 'yyy', 'zzz',
-  // Common OCR errors that look like words
-  'tlie', 'liave', 'wlien', 'tliat', 'tliis', 'wliat', 'wliich',
+  // Other common OCR misreads
   'rhe', 'ehe', 'che', 'dhe', 'fhe', 'ghe', 'hhe', 'jhe', 'khe',
   // Short meaningless combinations
-  'ack', 'eck', 'ick', 'ock', 'uck', 'ank', 'enk', 'ink', 'onk', 'unk',
+  'ack', 'eck', 'ick', 'ock', 'uck', 'ank', 'enk', 'onk', 'unk',
   'ast', 'est', 'ist', 'ost', 'ust', 'aft', 'eft', 'ift', 'oft', 'uft',
+  // Other gibberish
+  'ght', 'nge', 'ple', 'ble', 'dle', 'tle', 'gle', 'fle', 'sle',
 ]);
 
-// Validate if a string looks like a valid English word
-export function isValidEnglishWord(word: string): boolean {
+// Validate if a string looks like a valid English word or phrase
+export function isValidEnglishWord(input: string): boolean {
+  // Handle phrases (contains space) - validate each word
+  if (input.includes(' ')) {
+    const words = input.split(/\s+/);
+    // Phrase should have 2-4 words max
+    if (words.length > 4) return false;
+    // Each word in phrase must be valid letters
+    return words.every(w => /^[a-zA-Z]+$/.test(w) && w.length >= 1);
+  }
+
+  // Single word validation
+  const word = input;
+
   // Must be at least 3 characters (skip 2-letter words like "ey")
   if (word.length < 3) return false;
 
