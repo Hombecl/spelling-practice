@@ -11,7 +11,7 @@ import {
 } from '@/lib/progress';
 import { Word } from '@/lib/words';
 import { CustomWordList, markWordListUsed } from '@/lib/customWords';
-import ChooseMode from '@/components/modes/ChooseMode';
+import PhonicsMode from '@/components/modes/PhonicsMode';
 import FillMode from '@/components/modes/FillMode';
 import SpellMode from '@/components/modes/SpellMode';
 import ModeSelector from '@/components/ModeSelector';
@@ -55,7 +55,7 @@ export default function Home() {
     if (!progress) return builtInWords.simple;
 
     switch (progress.currentMode) {
-      case 'choose':
+      case 'phonics':
         return builtInWords.simple;
       case 'fill':
         return builtInWords.medium;
@@ -128,7 +128,7 @@ export default function Home() {
   };
 
   // Handle mode change
-  const handleSelectMode = (mode: 'choose' | 'fill' | 'spell') => {
+  const handleSelectMode = (mode: 'phonics' | 'fill' | 'spell') => {
     if (!progress) return;
     const newProgress = { ...progress, currentMode: mode };
     setProgress(newProgress);
@@ -272,8 +272,8 @@ export default function Home() {
             </div>
 
             {/* Current Mode */}
-            {progress.currentMode === 'choose' && (
-              <ChooseMode
+            {progress.currentMode === 'phonics' && (
+              <PhonicsMode
                 word={currentWord}
                 onComplete={handleWordComplete}
                 onSkip={handleSkip}

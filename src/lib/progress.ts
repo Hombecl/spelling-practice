@@ -20,7 +20,7 @@ export interface LevelProgress {
 export interface UserProgress {
   name?: string;
   currentLevel: number;
-  currentMode: 'choose' | 'fill' | 'spell';
+  currentMode: 'phonics' | 'fill' | 'spell';
   totalStars: number;
   badges: string[];
   wordProgress: Record<string, WordProgress>;
@@ -34,7 +34,7 @@ const STORAGE_KEY = 'spelling-practice-progress';
 
 const defaultProgress: UserProgress = {
   currentLevel: 1,
-  currentMode: 'choose',
+  currentMode: 'phonics',
   totalStars: 0,
   badges: [],
   wordProgress: {},

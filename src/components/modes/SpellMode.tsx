@@ -158,9 +158,9 @@ export default function SpellMode({ word, onComplete, onSkip }: SpellModeProps) 
       {/* Instructions */}
       <div className="text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-700 mb-1">
-          聽讀音，串出成個字！
+          🏆 完整串字
         </h2>
-        <p className="text-sm text-gray-500">Listen and spell the whole word</p>
+        <p className="text-sm text-gray-500">聽讀音，自己串出成個字</p>
       </div>
 
       {/* Word Image */}

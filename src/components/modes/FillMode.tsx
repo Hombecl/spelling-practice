@@ -5,7 +5,6 @@ import { Word, shuffleArray } from '@/lib/words';
 import { speakEncouragement, speakTryAgain, speakLetter, speakWord } from '@/lib/speech';
 import LetterButton from '@/components/LetterButton';
 import SpeakButton from '@/components/SpeakButton';
-import WordDisplay from '@/components/WordDisplay';
 import StarBurst from '@/components/StarBurst';
 import WordImage from '@/components/WordImage';
 import PhonicsDisplay from '@/components/PhonicsDisplay';
@@ -27,18 +26,19 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
   const [attempts, setAttempts] = useState(0);
   const [errors, setErrors] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [incorrectIndex, setIncorrectIndex] = useState(-1);
+  const [incorrectLetter, setIncorrectLetter] = useState<string | null>(null);
   const [isCooldown, setIsCooldown] = useState(false);
   const [showReset, setShowReset] = useState(false);
   const [showPhonics, setShowPhonics] = useState(false);
 
-  // Reveal some letters (keep 1-2 hidden based on word length)
+  // Reveal some letters based on word length
   const generateRevealedIndices = useCallback(() => {
     const wordLength = word.word.length;
-    const numToHide = Math.min(2, Math.max(1, Math.floor(wordLength / 2)));
+    // Hide more letters for longer words
+    const numToHide = Math.min(3, Math.max(1, Math.ceil(wordLength / 2)));
     const indices = Array.from({ length: wordLength }, (_, i) => i);
     const hidden = shuffleArray(indices).slice(0, numToHide);
-    return indices.filter((i) => !hidden.includes(i));
+    return indices.filter((i) => !hidden.includes(i)).sort((a, b) => a - b);
   }, [word]);
 
   // Generate letter choices
@@ -54,19 +54,26 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
     return shuffleArray([...hiddenLetters, ...randomDecoys]);
   }, [word]);
 
+  // Find first hidden index
+  const findFirstHiddenIndex = useCallback((revealed: number[], input: string[]) => {
+    for (let i = 0; i < word.word.length; i++) {
+      if (!revealed.includes(i) && !input[i]) {
+        return i;
+      }
+    }
+    return -1;
+  }, [word.word.length]);
+
   // Reset the current word
   const resetWord = useCallback(() => {
     const revealed = generateRevealedIndices();
     setRevealedIndices(revealed);
-    setUserInput(new Array(word.word.length).fill(''));
-    setCurrentIndex(
-      Array.from({ length: word.word.length }, (_, i) => i).find(
-        (i) => !revealed.includes(i)
-      ) || 0
-    );
+    const newInput = new Array(word.word.length).fill('');
+    setUserInput(newInput);
+    setCurrentIndex(findFirstHiddenIndex(revealed, newInput));
     setErrors(0);
     setShowReset(false);
-    setIncorrectIndex(-1);
+    setIncorrectLetter(null);
     setIsCooldown(false);
 
     const hiddenIndices = Array.from({ length: word.word.length }, (_, i) => i).filter(
@@ -74,21 +81,18 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
     );
     setAvailableLetters(generateLetters(hiddenIndices));
     speakWord(word.word);
-  }, [word, generateRevealedIndices, generateLetters]);
+  }, [word, generateRevealedIndices, generateLetters, findFirstHiddenIndex]);
 
   useEffect(() => {
     const revealed = generateRevealedIndices();
     setRevealedIndices(revealed);
-    setUserInput(new Array(word.word.length).fill(''));
-    setCurrentIndex(
-      Array.from({ length: word.word.length }, (_, i) => i).find(
-        (i) => !revealed.includes(i)
-      ) || 0
-    );
+    const newInput = new Array(word.word.length).fill('');
+    setUserInput(newInput);
+    setCurrentIndex(findFirstHiddenIndex(revealed, newInput));
     setAttempts(0);
     setErrors(0);
     setShowSuccess(false);
-    setIncorrectIndex(-1);
+    setIncorrectLetter(null);
     setIsCooldown(false);
     setShowReset(false);
     setShowPhonics(false);
@@ -97,10 +101,10 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
       (i) => !revealed.includes(i)
     );
     setAvailableLetters(generateLetters(hiddenIndices));
-  }, [word, generateRevealedIndices, generateLetters]);
+  }, [word, generateRevealedIndices, generateLetters, findFirstHiddenIndex]);
 
   const handleLetterClick = (letter: string) => {
-    if (isCooldown || showReset || showSuccess) return;
+    if (isCooldown || showReset || showSuccess || currentIndex === -1) return;
 
     const expectedLetter = word.word[currentIndex];
 
@@ -111,11 +115,9 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
       setUserInput(newInput);
 
       // Find next hidden index
-      const hiddenIndices = Array.from({ length: word.word.length }, (_, i) => i).filter(
-        (i) => !revealedIndices.includes(i) && !newInput[i]
-      );
+      const nextIndex = findFirstHiddenIndex(revealedIndices, newInput);
 
-      if (hiddenIndices.length === 0) {
+      if (nextIndex === -1) {
         // Word complete!
         setShowSuccess(true);
         speakEncouragement();
@@ -123,22 +125,22 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
           onComplete(true, attempts + 1);
         }, 1500);
       } else {
-        setCurrentIndex(hiddenIndices[0]);
+        setCurrentIndex(nextIndex);
       }
-      setIncorrectIndex(-1);
+      setIncorrectLetter(null);
     } else {
       // Wrong letter
       const newErrors = errors + 1;
       setErrors(newErrors);
       setAttempts(attempts + 1);
-      setIncorrectIndex(currentIndex);
+      setIncorrectLetter(letter);
       speakTryAgain();
 
       // Start cooldown
       setIsCooldown(true);
       setTimeout(() => {
         setIsCooldown(false);
-        setIncorrectIndex(-1);
+        setIncorrectLetter(null);
       }, COOLDOWN_MS);
 
       // Check if max errors reached
@@ -150,22 +152,36 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
   };
 
   const handleHint = () => {
-    const letter = word.word[currentIndex];
-    speakLetter(letter);
+    if (currentIndex >= 0) {
+      const letter = word.word[currentIndex];
+      speakLetter(letter);
+    }
   };
 
-  const revealedLetters = word.word.split('').map((_, i) => revealedIndices.includes(i));
+  // Build display with revealed and user input
+  const displayLetters = word.word.split('').map((letter, index) => {
+    if (revealedIndices.includes(index)) {
+      return { letter, status: 'revealed' as const };
+    }
+    if (userInput[index]) {
+      return { letter: userInput[index], status: 'filled' as const };
+    }
+    if (index === currentIndex) {
+      return { letter: '_', status: 'current' as const };
+    }
+    return { letter: '_', status: 'empty' as const };
+  });
 
   return (
-    <div className="flex flex-col items-center gap-4 sm:gap-6 p-2 sm:p-4">
+    <div className="flex flex-col items-center gap-4 sm:gap-5 p-2 sm:p-4">
       <StarBurst show={showSuccess} count={5} />
 
-      {/* Instructions */}
+      {/* Header */}
       <div className="text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-700 mb-1">
-          填返漏咗嘅字母！
+          ✏️ 填充練習
         </h2>
-        <p className="text-sm text-gray-500">Fill in the missing letters</p>
+        <p className="text-sm text-gray-500">聽讀音，填返漏咗嘅字母</p>
       </div>
 
       {/* Word Image */}
@@ -195,14 +211,38 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
       </div>
 
       {/* Word Display */}
-      <WordDisplay
-        word={word.word}
-        revealedLetters={revealedLetters}
-        userInput={userInput}
-        mode="fill"
-        currentIndex={currentIndex}
-        incorrectIndex={incorrectIndex}
-      />
+      <div className="flex gap-2 sm:gap-3 justify-center items-center flex-wrap">
+        {displayLetters.map((item, index) => (
+          <div
+            key={index}
+            className={`
+              w-12 h-14 sm:w-14 sm:h-16
+              rounded-xl border-3
+              flex items-center justify-center
+              text-2xl sm:text-3xl font-bold
+              transition-all duration-200
+              ${
+                item.status === 'revealed'
+                  ? 'bg-blue-100 border-blue-300 text-blue-700'
+                  : item.status === 'filled'
+                  ? 'bg-green-100 border-green-400 text-green-700'
+                  : item.status === 'current'
+                  ? 'bg-yellow-100 border-yellow-400 text-yellow-700 animate-pulse'
+                  : 'bg-gray-100 border-gray-300 text-gray-400'
+              }
+            `}
+          >
+            {item.letter.toUpperCase()}
+          </div>
+        ))}
+      </div>
+
+      {/* Instructions */}
+      {!showReset && currentIndex >= 0 && (
+        <p className="text-sm text-gray-500">
+          填第 {currentIndex + 1} 個字母
+        </p>
+      )}
 
       {/* Reset Warning */}
       {showReset && (
@@ -238,6 +278,7 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
               letter={letter}
               onClick={handleLetterClick}
               disabled={isCooldown}
+              incorrect={incorrectLetter === letter}
               size="md"
             />
           ))}
