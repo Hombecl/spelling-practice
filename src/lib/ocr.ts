@@ -15,20 +15,21 @@ export interface HighlightDetectionResult {
   highlightedRegions: { x: number; y: number; width: number; height: number }[];
 }
 
-// Common highlighter colors (HSL ranges) - relaxed for real-world photos
+// Common highlighter colors (HSL ranges) - very relaxed for real-world photos
+// Note: Phone cameras can shift colors significantly
 const HIGHLIGHT_COLORS = {
-  // Yellow highlighter - most common, very wide range
-  yellow: { hMin: 35, hMax: 75, sMin: 20, lMin: 45, lMax: 95 },
-  // Pink/magenta highlighter
-  pink: { hMin: 290, hMax: 360, sMin: 15, lMin: 45, lMax: 95 },
-  // Also catch pink in 0-10 range (wraps around)
-  pinkLow: { hMin: 0, hMax: 15, sMin: 15, lMin: 45, lMax: 95 },
-  // Green highlighter
-  green: { hMin: 70, hMax: 160, sMin: 15, lMin: 35, lMax: 90 },
-  // Blue highlighter
-  blue: { hMin: 170, hMax: 250, sMin: 15, lMin: 45, lMax: 90 },
-  // Orange highlighter
-  orange: { hMin: 10, hMax: 40, sMin: 25, lMin: 45, lMax: 90 },
+  // Yellow highlighter - most common, very wide range (includes greenish-yellow)
+  yellow: { hMin: 30, hMax: 80, sMin: 15, lMin: 40, lMax: 98 },
+  // Pink/magenta highlighter - wide range
+  pink: { hMin: 280, hMax: 360, sMin: 10, lMin: 40, lMax: 98 },
+  // Also catch pink in 0-20 range (wraps around)
+  pinkLow: { hMin: 0, hMax: 20, sMin: 10, lMin: 40, lMax: 98 },
+  // Green highlighter - wider range
+  green: { hMin: 60, hMax: 170, sMin: 10, lMin: 30, lMax: 95 },
+  // Blue highlighter - wider range
+  blue: { hMin: 160, hMax: 260, sMin: 10, lMin: 40, lMax: 95 },
+  // Orange highlighter - wider range
+  orange: { hMin: 5, hMax: 45, sMin: 20, lMin: 40, lMax: 95 },
 };
 
 // Convert RGB to HSL
@@ -281,7 +282,8 @@ function checkWordHighlighted(
   }
 
   const ratio = totalSamples > 0 ? highlightedCount / totalSamples : 0;
-  const isHighlighted = ratio > 0.3;
+  // Lower threshold to 15% for better detection (highlighter may only partially cover text)
+  const isHighlighted = ratio > 0.15;
 
   // Debug logging for first few words
   if (wordText) {

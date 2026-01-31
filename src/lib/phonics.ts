@@ -411,8 +411,9 @@ const SYLLABLE_PRONUNCIATION: Record<string, string> = {
   'stle': 'sul',     // whistle → whis-sul, castle → cas-sul (t is silent)
 
   // ========== PLURAL/VERB SUFFIXES ==========
-  'ies': 'eez',      // fairies → fair-eez, babies → ba-beez
-  'ries': 'reez',    // fairies split as fair-ries → "reez"
+  // Use phonetic spellings that TTS reads correctly
+  'ies': 'ease',     // fairies → fair-ease (TTS reads "eez" wrong)
+  'ries': 'rees',    // fairies split as fair-ries → "rees"
   'ves': 'vz',       // leaves → leevz
   'es': 'iz',        // boxes → box-iz, watches → watch-iz
   'ied': 'eed',      // carried → car-eed

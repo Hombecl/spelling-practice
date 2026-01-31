@@ -105,6 +105,24 @@ const WORD_EMOJIS: Record<string, string> = {
   birthday: '🎂', party: '🎉', wedding: '💒', christmas: '🎄', halloween: '🎃',
   love: '❤️', peace: '☮️', magic: '✨', dream: '💭', wish: '⭐',
   secret: '🤫', story: '📖', adventure: '🗺️', treasure: '💎', castle: '🏰',
+
+  // Common abstract/action words (with representative emojis)
+  // Note: some words like morning, home already defined above - skip duplicates
+  food: '🍲', little: '🤏', big: '👐', small: '🤏', doing: '✊', going: '🚶',
+  coming: '👋', you: '👆', me: '👇', we: '👫', they: '👥', he: '👨', she: '👩',
+  yes: '✅', no: '❌', good: '👍', bad: '👎', great: '🌟', best: '🏆',
+  new: '✨', old: '📜', fast: '⚡', slow: '🐢', up: '⬆️', down: '⬇️',
+  into: '📥', out: '📤', on: '🔛', off: '📴', open: '📖', close: '📕',
+  start: '▶️', stop: '⏹️', help: '🆘', please: '🙏', thank: '🙏', sorry: '😔',
+  hello: '👋', goodbye: '👋', day: '☀️',
+  time: '⏰', place: '📍', thing: '📦', way: '➡️', work: '💼',
+  make: '🔨', take: '✋', give: '🎁', get: '📬', find: '🔍', know: '💡',
+  want: '💭', need: '❗', like: '👍', see: '👀', hear: '👂', feel: '💓',
+
+  // More fairy tale words
+  dragon: '🐉', unicorn: '🦄', mermaid: '🧜‍♀️', wizard: '🧙‍♂️', witch: '🧙‍♀️',
+  giant: '🦣', dwarf: '🧝', elf: '🧝‍♂️', goblin: '👺', troll: '👹',
+  knight: '🤺', sword: '⚔️', shield: '🛡️', crown: '👑', wand: '🪄',
 };
 
 // Get emoji for a word
