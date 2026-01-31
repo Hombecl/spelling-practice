@@ -189,7 +189,7 @@ const GARBAGE_WORDS = new Set([
   'ght', 'nge', 'ple', 'ble', 'dle', 'tle', 'gle', 'fle', 'sle',
 ]);
 
-// Parse simple line-by-line output from Gemini
+// Parse output from Gemini - handles both single words and full phrases/sentences
 function parseSimpleOutput(text: string, mode: string): { words: string[]; highlightedWords: string[] } {
   const words: string[] = [];
   const seen = new Set<string>();
@@ -201,41 +201,56 @@ function parseSimpleOutput(text: string, mode: string): { words: string[]; highl
     let phrase = line.trim();
     if (!phrase) continue;
 
-    // Skip if it looks like instructions or explanations
-    if (phrase.includes(':') && phrase.length > 30) continue;
+    // Skip obvious non-content lines
     if (phrase.toLowerCase().includes('no_words') || phrase.toLowerCase().includes('no words')) continue;
-    if (phrase.startsWith('#') || phrase.startsWith('*')) continue;
+    if (phrase.toLowerCase().includes('找不到') || phrase.toLowerCase().includes('沒有')) continue;
 
-    // Remove common prefixes like "- ", "• ", "1. "
-    phrase = phrase.replace(/^[\-\•\*\d\.]+\s*/, '');
+    // Skip section headers (e.g., "From Section 3:", "Highlighted Words:")
+    if (/^(from|section|highlighted|additional|song|lyrics)[\s\w]*:/i.test(phrase)) continue;
+    if (phrase.startsWith('#')) continue;
 
-    // Remove any remaining non-letter characters at start/end
-    phrase = phrase.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z\s]+$/, '');
+    // Remove bullet points and numbering prefixes
+    phrase = phrase.replace(/^[\-\•\*]+\s*/, '');
+    phrase = phrase.replace(/^\d+[\.\)]\s*/, '');
 
-    // Clean internal spaces (normalize multiple spaces)
+    // Remove surrounding quotes if present (keep content inside)
+    phrase = phrase.replace(/^["'""](.+)["'""]$/, '$1');
+
+    // Clean internal spaces
     phrase = phrase.replace(/\s+/g, ' ').trim();
 
     if (!phrase || phrase.length < 2) continue;
 
-    // Normalize to lowercase for deduplication
-    const normalized = phrase.toLowerCase();
-    if (seen.has(normalized)) continue;
-
-    // Basic validation: must contain letters, not too long
+    // Must contain at least one English letter
     if (!/[a-zA-Z]/.test(phrase)) continue;
-    if (phrase.split(/\s+/).length > 4) continue; // Max 4 words
 
-    // Skip known garbage words (backup filter)
-    if (GARBAGE_WORDS.has(normalized)) continue;
+    // Skip if it's mostly Chinese (allow mixed content like explanations to be filtered)
+    const chineseChars = (phrase.match(/[\u4e00-\u9fff]/g) || []).length;
+    const englishChars = (phrase.match(/[a-zA-Z]/g) || []).length;
+    if (chineseChars > englishChars) continue;
+
+    // Normalize for deduplication (lowercase, trim punctuation for comparison)
+    const normalized = phrase.toLowerCase().replace(/[^\w\s]/g, '').trim();
+    if (seen.has(normalized)) continue;
+    if (!normalized) continue;
+
+    // Skip single garbage words (but allow phrases)
+    const wordCount = phrase.split(/\s+/).length;
+    if (wordCount === 1 && GARBAGE_WORDS.has(normalized)) continue;
 
     seen.add(normalized);
-    words.push(normalized);
+
+    // Keep the original phrase with proper casing and punctuation for display
+    // But clean up any leading/trailing punctuation
+    let cleaned = phrase.replace(/^[^\w]+/, '').replace(/[^\w!?.]+$/, '');
+    // Capitalize first letter
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+
+    words.push(cleaned);
   }
 
   console.log('[OCR] Parsed words:', words);
 
-  // In highlighted mode, all words are considered highlighted
-  // In smart mode, all words are vocabulary
   return {
     words,
     highlightedWords: mode === 'highlighted' ? words : [],

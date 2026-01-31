@@ -484,26 +484,30 @@ const GARBAGE_WORDS = new Set([
 
 // Validate if a string looks like a valid English word or phrase
 export function isValidEnglishWord(input: string): boolean {
-  // Handle phrases (contains space) - validate each word
-  if (input.includes(' ')) {
-    const words = input.split(/\s+/);
-    // Phrase should have 2-4 words max
-    if (words.length > 4) return false;
-    // Each word in phrase must be valid letters
+  // Clean input - remove punctuation for validation but keep spaces
+  const cleaned = input.replace(/[^\w\s]/g, '').trim();
+  if (!cleaned) return false;
+
+  // Handle phrases (contains space) - more lenient for AI-extracted phrases
+  if (cleaned.includes(' ')) {
+    const words = cleaned.split(/\s+/);
+    // Allow longer phrases (up to 12 words for sentences like song lyrics)
+    if (words.length > 12) return false;
+    // Each word should be mostly letters (allow contractions like "don't" → "dont" after cleaning)
     return words.every(w => /^[a-zA-Z]+$/.test(w) && w.length >= 1);
   }
 
   // Single word validation
-  const word = input;
+  const word = cleaned;
 
-  // Must be at least 3 characters (skip 2-letter words like "ey")
-  if (word.length < 3) return false;
+  // Must be at least 2 characters (allow short words like "do", "go", "we")
+  if (word.length < 2) return false;
 
   // Must only contain letters
   if (!/^[a-zA-Z]+$/.test(word)) return false;
 
-  // Must have at least one vowel
-  if (!/[aeiou]/i.test(word)) return false;
+  // Must have at least one vowel (for words 3+ chars)
+  if (word.length >= 3 && !/[aeiou]/i.test(word)) return false;
 
   // Check against known garbage words
   if (GARBAGE_WORDS.has(word.toLowerCase())) return false;
@@ -517,15 +521,14 @@ export function isValidEnglishWord(input: string): boolean {
   // Skip words with too many consecutive vowels (likely OCR errors)
   if (/[aeiou]{4,}/i.test(word)) return false;
 
-  // Common OCR garbage patterns
-  if (/^[aeiou]{2,3}$/i.test(word)) return false;  // Just vowels like "ey", "oa"
-  if (/^[bcdfghjklmnpqrstvwxyz]{2,3}$/i.test(word)) return false;  // Just consonants
+  // Common OCR garbage patterns (only for short words)
+  if (word.length <= 3) {
+    if (/^[aeiou]{2,3}$/i.test(word)) return false;  // Just vowels like "ey", "oa"
+    if (/^[bcdfghjklmnpqrstvwxyz]{2,3}$/i.test(word)) return false;  // Just consonants
+  }
 
-  // Skip words that look like suffixes/prefixes only
-  if (/^(un|re|de|pre|pro|anti|dis|mis|non|sub|super|over|under|out|up|down|fore|post|mid|semi|self|co|ex|bi|tri|multi|poly|mono|uni|omni|pan|auto|pseudo|neo|proto|meta|para|ultra|infra|intra|inter|trans|extra|hyper|hypo)$/i.test(word)) return false;
-
-  // Skip words that are just common suffixes
-  if (/^(ing|tion|sion|ness|ment|able|ible|ful|less|ous|ive|al|ly|er|est|ed|en|ity|ty|ry|ary|ory|ery)$/i.test(word)) return false;
+  // Skip words that are just common suffixes (only for standalone words)
+  if (/^(ing|tion|sion|ness|ment|able|ible|ful|less|ous|ive|ary|ory|ery|ity)$/i.test(word)) return false;
 
   return true;
 }
