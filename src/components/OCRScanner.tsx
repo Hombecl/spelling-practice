@@ -17,6 +17,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
+  const [ocrSource, setOcrSource] = useState<'deepseek-ocr' | 'tesseract' | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +47,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
 
       setExtractedWords(validWords);
       setHighlightedWords(new Set(validHighlighted));
+      setOcrSource(result.source || null);
 
       // If highlighted words found, select only those by default
       if (validHighlighted.length > 0) {
@@ -283,10 +285,17 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 ))}
               </div>
 
-              {/* Selected Count */}
-              <p className="text-center text-sm text-gray-500 mt-3">
-                已選擇 {selectedWords.size} 個字
-              </p>
+              {/* Selected Count and OCR Source */}
+              <div className="text-center mt-3">
+                <p className="text-sm text-gray-500">
+                  已選擇 {selectedWords.size} 個字
+                </p>
+                {ocrSource && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {ocrSource === 'deepseek-ocr' ? '🤖 DeepSeek AI OCR' : '📝 本地 OCR'}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -322,7 +331,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
               }}
               className="flex-1 px-4 py-3 bg-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-300"
             >
-              重新影相
+              重新掃描
             </button>
             <button
               onClick={handleConfirm}

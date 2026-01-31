@@ -1,4 +1,4 @@
-// OCR utilities using Tesseract.js
+// OCR utilities - supports DeepSeek OCR (via Replicate) with Tesseract.js fallback
 import Tesseract from 'tesseract.js';
 
 export interface OCRResult {
@@ -8,6 +8,18 @@ export interface OCRResult {
   rawText: string;
   confidence: number;
   error?: string;
+  source?: 'deepseek-ocr' | 'tesseract';
+}
+
+// DeepSeek OCR API response type
+interface DeepSeekOCRResponse {
+  success: boolean;
+  words: string[];
+  highlightedWords: string[];
+  rawText: string;
+  source: string;
+  error?: string;
+  useLocalOCR?: boolean;
 }
 
 export interface HighlightDetectionResult {
@@ -168,8 +180,84 @@ function createHighlightMask(imageData: ImageData): boolean[][] {
   return mask;
 }
 
+// Convert File to base64 data URL
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Try DeepSeek OCR via our API route
+async function tryDeepSeekOCR(
+  imageSource: File | string,
+  onProgress?: (progress: number) => void
+): Promise<OCRResult | null> {
+  try {
+    onProgress?.(10);
+
+    // Convert to base64 if it's a File
+    let imageData: string;
+    if (typeof imageSource === 'string') {
+      imageData = imageSource;
+    } else {
+      imageData = await fileToBase64(imageSource);
+    }
+
+    onProgress?.(20);
+
+    const response = await fetch('/api/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData }),
+    });
+
+    onProgress?.(80);
+
+    const data: DeepSeekOCRResponse = await response.json();
+
+    // If API says to use local OCR, return null to trigger fallback
+    if (data.useLocalOCR || !response.ok) {
+      console.log('[OCR] DeepSeek OCR unavailable, falling back to Tesseract');
+      return null;
+    }
+
+    onProgress?.(100);
+
+    return {
+      success: data.success,
+      words: data.words || [],
+      highlightedWords: data.highlightedWords || [],
+      rawText: data.rawText || '',
+      confidence: 95, // DeepSeek OCR is generally very accurate
+      source: 'deepseek-ocr',
+    };
+  } catch (error) {
+    console.log('[OCR] DeepSeek OCR failed, falling back to Tesseract:', error);
+    return null;
+  }
+}
+
 // Extract English words from an image with highlight detection
+// Tries DeepSeek OCR first, falls back to Tesseract.js
 export async function extractWordsFromImage(
+  imageSource: File | string,
+  onProgress?: (progress: number) => void
+): Promise<OCRResult> {
+  // Try DeepSeek OCR first (better accuracy)
+  const deepSeekResult = await tryDeepSeekOCR(imageSource, onProgress);
+  if (deepSeekResult) {
+    return deepSeekResult;
+  }
+
+  // Fallback to Tesseract.js (local, no API key needed)
+  return extractWordsWithTesseract(imageSource, onProgress);
+}
+
+// Original Tesseract-based OCR (kept as fallback)
+async function extractWordsWithTesseract(
   imageSource: File | string,
   onProgress?: (progress: number) => void
 ): Promise<OCRResult> {
@@ -237,6 +325,7 @@ export async function extractWordsFromImage(
       highlightedWords,
       rawText,
       confidence,
+      source: 'tesseract',
     };
   } catch (error) {
     return {
@@ -246,6 +335,7 @@ export async function extractWordsFromImage(
       rawText: '',
       confidence: 0,
       error: error instanceof Error ? error.message : 'OCR failed',
+      source: 'tesseract',
     };
   }
 }
