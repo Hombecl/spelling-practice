@@ -13,17 +13,23 @@ const COLOR_NAMES: Record<string, string> = {
   green: 'GREEN',
   blue: 'BLUE',
   orange: 'ORANGE',
-  any: 'any color',
 };
 
 // Build prompt based on scan mode
-function buildPrompt(mode: string, highlightColor?: string): string {
+function buildPrompt(mode: string, highlightColors?: string[]): string {
   if (mode === 'highlighted') {
-    const colorText = highlightColor && highlightColor !== 'any'
-      ? COLOR_NAMES[highlightColor] || highlightColor.toUpperCase()
-      : 'any color';
+    // Build color text based on selected colors
+    let colorText: string;
+    if (!highlightColors || highlightColors.length === 0 || highlightColors.length === 5) {
+      colorText = 'any color';
+    } else if (highlightColors.length === 1) {
+      colorText = COLOR_NAMES[highlightColors[0]] || highlightColors[0].toUpperCase();
+    } else {
+      const colorNames = highlightColors.map(c => COLOR_NAMES[c] || c.toUpperCase());
+      colorText = colorNames.slice(0, -1).join(', ') + ' or ' + colorNames[colorNames.length - 1];
+    }
 
-    return `You are an OCR assistant for a children's spelling practice app. The user has marked specific words with a ${colorText} HIGHLIGHTER PEN.
+    return `You are an OCR assistant for a children's spelling practice app. The user has marked specific words with ${colorText} HIGHLIGHTER PEN.
 
 YOUR TASK: Extract ONLY the words that are highlighted with ${colorText} highlighter.
 
@@ -36,9 +42,9 @@ CRITICAL INSTRUCTIONS:
 6. Keep original spelling (don't correct typos)
 
 WHAT TO LOOK FOR:
-- Words with bright ${colorText} background/overlay
-- Text that appears to have highlighter pen marking
-- Semi-transparent colored marks over text
+- Words with bright ${colorText} background/overlay (semi-transparent highlighter color)
+- Text that appears to have highlighter pen marking over it
+- The highlighter color should be clearly visible on or around the text
 
 Example output format (only highlighted words):
 **apple**
@@ -86,7 +92,7 @@ Now extract suitable spelling practice words from this image:`;
 
 export async function POST(request: NextRequest) {
   try {
-    const { image, mode = 'smart', highlightColor } = await request.json();
+    const { image, mode = 'smart', highlightColors } = await request.json();
 
     if (!image) {
       return NextResponse.json({ error: 'Image is required' }, { status: 400 });
@@ -101,7 +107,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Build appropriate prompt based on mode
-    const prompt = buildPrompt(mode, highlightColor);
+    const prompt = buildPrompt(mode, highlightColors);
 
     // Call OpenRouter with Gemini Flash Lite for OCR
     const response = await fetch(OPENROUTER_API_URL, {

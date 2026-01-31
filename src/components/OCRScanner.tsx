@@ -5,7 +5,7 @@ import { extractWordsFromImage, isValidEnglishWord } from '@/lib/ocr';
 
 // Scan mode options
 type ScanMode = 'select' | 'highlighted' | 'smart';
-type HighlightColor = 'yellow' | 'pink' | 'green' | 'blue' | 'orange' | 'any';
+type HighlightColor = 'yellow' | 'pink' | 'green' | 'blue' | 'orange';
 
 interface OCRScannerProps {
   onWordsExtracted: (words: string[]) => void;
@@ -15,7 +15,7 @@ interface OCRScannerProps {
 export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProps) {
   // Pre-scan selection state
   const [scanMode, setScanMode] = useState<ScanMode>('select');
-  const [highlightColor, setHighlightColor] = useState<HighlightColor>('yellow');
+  const [selectedColors, setSelectedColors] = useState<Set<HighlightColor>>(new Set(['yellow']));
 
   // Processing state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -27,7 +27,10 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [error, setError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
   const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'tesseract' | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Separate refs for camera and gallery
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -46,9 +49,10 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     setError(null);
 
     // Pass scan options to OCR
+    const colorsArray = Array.from(selectedColors);
     const ocrOptions = {
       mode: scanMode,
-      highlightColor: scanMode === 'highlighted' ? highlightColor : undefined,
+      highlightColors: scanMode === 'highlighted' ? colorsArray : undefined,
     };
 
     const result = await extractWordsFromImage(file, (p) => setProgress(p), ocrOptions);
@@ -119,8 +123,12 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     }
   };
 
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
+  const triggerCamera = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const triggerGallery = () => {
+    galleryInputRef.current?.click();
   };
 
   const resetToSelection = () => {
@@ -132,14 +140,40 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     setError(null);
   };
 
-  const highlightColorOptions: { value: HighlightColor; label: string; emoji: string; bgClass: string }[] = [
-    { value: 'yellow', label: '黃色', emoji: '💛', bgClass: 'bg-yellow-200 border-yellow-400' },
-    { value: 'pink', label: '粉紅', emoji: '💗', bgClass: 'bg-pink-200 border-pink-400' },
-    { value: 'green', label: '綠色', emoji: '💚', bgClass: 'bg-green-200 border-green-400' },
-    { value: 'blue', label: '藍色', emoji: '💙', bgClass: 'bg-blue-200 border-blue-400' },
-    { value: 'orange', label: '橙色', emoji: '🧡', bgClass: 'bg-orange-200 border-orange-400' },
-    { value: 'any', label: '任何顏色', emoji: '🌈', bgClass: 'bg-gradient-to-r from-yellow-200 via-pink-200 to-blue-200 border-purple-400' },
+  const toggleColor = (color: HighlightColor) => {
+    const newColors = new Set(selectedColors);
+    if (newColors.has(color)) {
+      // Don't allow deselecting if it's the last one
+      if (newColors.size > 1) {
+        newColors.delete(color);
+      }
+    } else {
+      newColors.add(color);
+    }
+    setSelectedColors(newColors);
+  };
+
+  const selectAllColors = () => {
+    setSelectedColors(new Set(['yellow', 'pink', 'green', 'blue', 'orange']));
+  };
+
+  const highlightColorOptions: { value: HighlightColor; label: string; emoji: string; bgClass: string; selectedClass: string }[] = [
+    { value: 'yellow', label: '黃色', emoji: '💛', bgClass: 'bg-yellow-100', selectedClass: 'bg-yellow-300 border-yellow-500 ring-2 ring-yellow-400' },
+    { value: 'pink', label: '粉紅', emoji: '💗', bgClass: 'bg-pink-100', selectedClass: 'bg-pink-300 border-pink-500 ring-2 ring-pink-400' },
+    { value: 'green', label: '綠色', emoji: '💚', bgClass: 'bg-green-100', selectedClass: 'bg-green-300 border-green-500 ring-2 ring-green-400' },
+    { value: 'blue', label: '藍色', emoji: '💙', bgClass: 'bg-blue-100', selectedClass: 'bg-blue-300 border-blue-500 ring-2 ring-blue-400' },
+    { value: 'orange', label: '橙色', emoji: '🧡', bgClass: 'bg-orange-100', selectedClass: 'bg-orange-300 border-orange-500 ring-2 ring-orange-400' },
   ];
+
+  // Get selected colors text for display
+  const getSelectedColorsText = () => {
+    if (selectedColors.size === 5) return '所有顏色';
+    if (selectedColors.size === 1) {
+      const color = Array.from(selectedColors)[0];
+      return highlightColorOptions.find(o => o.value === color)?.label || '';
+    }
+    return `${selectedColors.size} 種顏色`;
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
@@ -208,46 +242,88 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 ← 返回
               </button>
 
-              <p className="text-center text-gray-600 mb-2">
-                你用咗咩顏色嘅螢光筆？
-              </p>
-
-              <div className="grid grid-cols-2 gap-2">
-                {highlightColorOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    onClick={() => setHighlightColor(option.value)}
-                    className={`p-3 rounded-xl border-2 transition-all ${
-                      highlightColor === option.value
-                        ? `${option.bgClass} border-2`
-                        : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <span className="text-2xl">{option.emoji}</span>
-                    <p className="text-sm font-medium mt-1">{option.label}</p>
-                  </button>
-                ))}
+              <div className="flex items-center justify-between">
+                <p className="text-gray-600">
+                  你用咗咩顏色嘅螢光筆？
+                </p>
+                <button
+                  onClick={selectAllColors}
+                  className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                >
+                  全選
+                </button>
               </div>
 
-              {/* Upload button after color selection */}
-              <div className="mt-6">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <button
-                  onClick={triggerFileInput}
-                  className="w-full py-4 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2"
-                >
-                  <span className="text-2xl">📷</span>
-                  影相掃描
-                </button>
-                <p className="text-center text-xs text-gray-400 mt-2">
-                  會搵出 {highlightColor === 'any' ? '所有顏色' : highlightColorOptions.find(o => o.value === highlightColor)?.label} 螢光筆標記嘅字
+              <p className="text-xs text-gray-400">
+                可以揀多過一種顏色
+              </p>
+
+              {/* Color checkboxes */}
+              <div className="grid grid-cols-2 gap-2">
+                {highlightColorOptions.map((option) => {
+                  const isSelected = selectedColors.has(option.value);
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => toggleColor(option.value)}
+                      className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${
+                        isSelected
+                          ? option.selectedClass
+                          : `${option.bgClass} border-gray-200 hover:border-gray-300`
+                      }`}
+                    >
+                      {/* Checkbox indicator */}
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                        isSelected
+                          ? 'bg-white border-gray-400'
+                          : 'border-gray-300'
+                      }`}>
+                        {isSelected && <span className="text-green-600 text-sm">✓</span>}
+                      </div>
+                      <span className="text-xl">{option.emoji}</span>
+                      <span className="text-sm font-medium">{option.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Hidden file inputs */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {/* Camera and Gallery buttons */}
+              <div className="mt-6 space-y-3">
+                <div className="flex gap-3">
+                  <button
+                    onClick={triggerCamera}
+                    className="flex-1 py-4 bg-yellow-500 text-white font-bold rounded-xl hover:bg-yellow-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="text-2xl">📷</span>
+                    影相
+                  </button>
+                  <button
+                    onClick={triggerGallery}
+                    className="flex-1 py-4 bg-yellow-100 text-yellow-700 font-bold rounded-xl hover:bg-yellow-200 transition-colors flex items-center justify-center gap-2 border-2 border-yellow-300"
+                  >
+                    <span className="text-2xl">🖼️</span>
+                    相簿
+                  </button>
+                </div>
+                <p className="text-center text-xs text-gray-400">
+                  會搵出 {getSelectedColorsText()} 螢光筆標記嘅字
                 </p>
               </div>
             </div>
@@ -280,21 +356,40 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 </p>
               </div>
 
+              {/* Hidden file inputs */}
               <input
-                ref={fileInputRef}
+                ref={cameraInputRef}
                 type="file"
                 accept="image/*"
                 capture="environment"
                 onChange={handleFileSelect}
                 className="hidden"
               />
-              <button
-                onClick={triggerFileInput}
-                className="w-full py-4 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
-              >
-                <span className="text-2xl">📷</span>
-                影相掃描
-              </button>
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
+              {/* Camera and Gallery buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={triggerCamera}
+                  className="flex-1 py-4 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="text-2xl">📷</span>
+                  影相
+                </button>
+                <button
+                  onClick={triggerGallery}
+                  className="flex-1 py-4 bg-blue-100 text-blue-700 font-bold rounded-xl hover:bg-blue-200 transition-colors flex items-center justify-center gap-2 border-2 border-blue-300"
+                >
+                  <span className="text-2xl">🖼️</span>
+                  相簿
+                </button>
+              </div>
             </div>
           )}
 

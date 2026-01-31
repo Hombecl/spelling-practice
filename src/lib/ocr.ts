@@ -25,7 +25,7 @@ interface GeminiOCRResponse {
 // OCR scan options
 export interface OCRScanOptions {
   mode: 'select' | 'highlighted' | 'smart';
-  highlightColor?: 'yellow' | 'pink' | 'green' | 'blue' | 'orange' | 'any';
+  highlightColors?: ('yellow' | 'pink' | 'green' | 'blue' | 'orange')[];
 }
 
 export interface HighlightDetectionResult {
@@ -221,7 +221,7 @@ async function tryGeminiOCR(
       body: JSON.stringify({
         image: imageData,
         mode: options?.mode || 'smart',
-        highlightColor: options?.highlightColor,
+        highlightColors: options?.highlightColors,
       }),
     });
 
