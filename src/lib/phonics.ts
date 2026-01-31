@@ -16,14 +16,24 @@ const VOWELS = ['a', 'e', 'i', 'o', 'u'];
 
 // Common English suffixes (should be kept as separate syllables)
 const SUFFIXES = [
-  'ing', 'ed', 'er', 'est', 'ly', 'ness', 'ment', 'ful', 'less',
-  'tion', 'sion', 'ous', 'ious', 'eous', 'able', 'ible', 'al', 'ial',
-  'ive', 'ative', 'itive', 'ure', 'ture', 'sure',
-  'ity', 'ty', 'ry', 'ary', 'ory', 'ery',
-  'ist', 'ism', 'ize', 'ise', 'en', 'ern',
-  'dom', 'hood', 'ship', 'ward', 'wise',
-  'ling', 'let', 'ette', 'ish', 'like',
-  'ous', 'eous', 'ious', 'ant', 'ent', 'ance', 'ence',
+  // Verb endings
+  'ing', 'ed', 'es', 's',
+  // Noun endings
+  'tion', 'sion', 'ness', 'ment', 'ity', 'ty',
+  'dom', 'hood', 'ship', 'ism', 'ist',
+  // Adjective endings
+  'ful', 'less', 'ous', 'ious', 'eous', 'ive', 'ative', 'itive',
+  'able', 'ible', 'al', 'ial', 'ic', 'ical',
+  'ant', 'ent', 'ish', 'like', 'ly',
+  // Comparative/superlative
+  'er', 'est',
+  // Plural forms (important for words like fairies, babies, etc.)
+  'ies', 'ves',
+  // Other common endings
+  'ure', 'ture', 'sure', 'ance', 'ence',
+  'ry', 'ary', 'ory', 'ery',
+  'en', 'ern', 'ling', 'let', 'ette',
+  'ward', 'wise',
 ];
 
 // Common English prefixes

@@ -15,13 +15,20 @@ export interface HighlightDetectionResult {
   highlightedRegions: { x: number; y: number; width: number; height: number }[];
 }
 
-// Common highlighter colors (HSL ranges)
+// Common highlighter colors (HSL ranges) - relaxed for real-world photos
 const HIGHLIGHT_COLORS = {
-  yellow: { hMin: 40, hMax: 70, sMin: 50, lMin: 50, lMax: 90 },
-  pink: { hMin: 300, hMax: 350, sMin: 30, lMin: 50, lMax: 90 },
-  green: { hMin: 80, hMax: 150, sMin: 30, lMin: 40, lMax: 85 },
-  blue: { hMin: 180, hMax: 240, sMin: 30, lMin: 50, lMax: 90 },
-  orange: { hMin: 15, hMax: 45, sMin: 50, lMin: 50, lMax: 85 },
+  // Yellow highlighter - most common, very wide range
+  yellow: { hMin: 35, hMax: 75, sMin: 20, lMin: 45, lMax: 95 },
+  // Pink/magenta highlighter
+  pink: { hMin: 290, hMax: 360, sMin: 15, lMin: 45, lMax: 95 },
+  // Also catch pink in 0-10 range (wraps around)
+  pinkLow: { hMin: 0, hMax: 15, sMin: 15, lMin: 45, lMax: 95 },
+  // Green highlighter
+  green: { hMin: 70, hMax: 160, sMin: 15, lMin: 35, lMax: 90 },
+  // Blue highlighter
+  blue: { hMin: 170, hMax: 250, sMin: 15, lMin: 45, lMax: 90 },
+  // Orange highlighter
+  orange: { hMin: 10, hMax: 40, sMin: 25, lMin: 45, lMax: 90 },
 };
 
 // Convert RGB to HSL
