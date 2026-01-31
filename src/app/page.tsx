@@ -321,7 +321,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="text-center py-6 sm:py-8 text-gray-400 text-xs sm:text-sm px-4">
-        <p>專為讀寫障礙小朋友設計 💙</p>
+        <p>專為小朋友設計嘅串字練習 💙</p>
       </footer>
     </main>
   );
