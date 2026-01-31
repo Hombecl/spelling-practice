@@ -67,7 +67,7 @@ function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: n
 function isHighlightColor(r: number, g: number, b: number): boolean {
   const { h, s, l } = rgbToHsl(r, g, b);
 
-  for (const color of Object.values(HIGHLIGHT_COLORS)) {
+  for (const [colorName, color] of Object.entries(HIGHLIGHT_COLORS)) {
     if (
       h >= color.hMin &&
       h <= color.hMax &&
@@ -79,6 +79,29 @@ function isHighlightColor(r: number, g: number, b: number): boolean {
     }
   }
   return false;
+}
+
+// Debug function to analyze image colors
+export function debugImageColors(imageData: ImageData): void {
+  const { width, height, data } = imageData;
+  const colorSamples: { r: number; g: number; b: number; h: number; s: number; l: number }[] = [];
+
+  // Sample every 50th pixel to get color distribution
+  for (let y = 0; y < height; y += 50) {
+    for (let x = 0; x < width; x += 50) {
+      const idx = (y * width + x) * 4;
+      const r = data[idx];
+      const g = data[idx + 1];
+      const b = data[idx + 2];
+      const hsl = rgbToHsl(r, g, b);
+      colorSamples.push({ r, g, b, ...hsl });
+    }
+  }
+
+  // Find potential highlight colors (high lightness, some saturation)
+  const potentialHighlights = colorSamples.filter(c => c.l > 40 && c.s > 10);
+  console.log('[OCR Debug] Color samples:', colorSamples.length);
+  console.log('[OCR Debug] Potential highlight colors:', potentialHighlights.slice(0, 10));
 }
 
 // Detect highlighted regions in an image
@@ -121,6 +144,8 @@ async function detectHighlightedRegions(imageSource: File | string): Promise<Ima
 function createHighlightMask(imageData: ImageData): boolean[][] {
   const { width, height, data } = imageData;
   const mask: boolean[][] = [];
+  let highlightedPixels = 0;
+  const totalPixels = width * height;
 
   for (let y = 0; y < height; y++) {
     mask[y] = [];
@@ -129,9 +154,15 @@ function createHighlightMask(imageData: ImageData): boolean[][] {
       const r = data[idx];
       const g = data[idx + 1];
       const b = data[idx + 2];
-      mask[y][x] = isHighlightColor(r, g, b);
+      const isHighlight = isHighlightColor(r, g, b);
+      mask[y][x] = isHighlight;
+      if (isHighlight) highlightedPixels++;
     }
   }
+
+  // Debug logging
+  console.log(`[OCR Debug] Image size: ${width}x${height}`);
+  console.log(`[OCR Debug] Highlighted pixels: ${highlightedPixels} / ${totalPixels} (${((highlightedPixels / totalPixels) * 100).toFixed(2)}%)`);
 
   return mask;
 }
@@ -147,7 +178,11 @@ export async function extractWordsFromImage(
     let highlightMask: boolean[][] | null = null;
 
     if (imageData) {
+      // Debug: analyze colors in the image
+      debugImageColors(imageData);
       highlightMask = createHighlightMask(imageData);
+    } else {
+      console.log('[OCR Debug] Failed to load image data');
     }
 
     // Step 2: Run OCR
@@ -181,7 +216,7 @@ export async function extractWordsFromImage(
         // Check if this word is in a highlighted region
         if (highlightMask && wordData.bbox) {
           const { x0, y0, x1, y1 } = wordData.bbox;
-          const isHighlighted = checkWordHighlighted(highlightMask, x0, y0, x1, y1);
+          const isHighlighted = checkWordHighlighted(highlightMask, x0, y0, x1, y1, lowerWord);
           if (isHighlighted && !highlightedWords.includes(lowerWord)) {
             highlightedWords.push(lowerWord);
           }
@@ -220,7 +255,8 @@ function checkWordHighlighted(
   x0: number,
   y0: number,
   x1: number,
-  y1: number
+  y1: number,
+  wordText?: string
 ): boolean {
   // Sample points within the bounding box
   const samplePoints = 10;
@@ -244,8 +280,15 @@ function checkWordHighlighted(
     }
   }
 
-  // Consider highlighted if >30% of samples are in highlighted regions
-  return totalSamples > 0 && highlightedCount / totalSamples > 0.3;
+  const ratio = totalSamples > 0 ? highlightedCount / totalSamples : 0;
+  const isHighlighted = ratio > 0.3;
+
+  // Debug logging for first few words
+  if (wordText) {
+    console.log(`[OCR Debug] Word "${wordText}" at (${x0},${y0})-(${x1},${y1}): ${highlightedCount}/${totalSamples} = ${(ratio * 100).toFixed(1)}% → ${isHighlighted ? 'HIGHLIGHTED' : 'normal'}`);
+  }
+
+  return isHighlighted;
 }
 
 // Clean a single word
