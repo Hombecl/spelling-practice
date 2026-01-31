@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 // OpenRouter API endpoint (OpenAI-compatible)
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Gemini 2.5 Flash Lite - cheapest vision model (~$0.10/1M input tokens)
-const MODEL = 'google/gemini-2.5-flash-lite';
+// Gemini 2.5 Flash - more capable vision model (~$0.25/1M input tokens)
+// Upgraded from Flash Lite for better vocabulary extraction accuracy
+const MODEL = 'google/gemini-2.5-flash-preview-05-20';
 
 // Color name mapping for prompts
 const COLOR_NAMES: Record<string, string> = {
