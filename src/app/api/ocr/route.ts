@@ -22,101 +22,48 @@ const COLOR_NAMES: Record<string, string> = {
 // ===========================================
 
 function buildPrompt(mode: string, highlightColors?: string[]): string {
-  let colorText = 'any color';
+  // Build color description for Chinese prompt
+  let colorDesc = '任何顏色';
   if (mode === 'highlighted' && highlightColors && highlightColors.length > 0 && highlightColors.length < 5) {
-    if (highlightColors.length === 1) {
-      colorText = COLOR_NAMES[highlightColors[0]] || highlightColors[0].toUpperCase();
-    } else {
-      const colorNames = highlightColors.map(c => COLOR_NAMES[c] || c.toUpperCase());
-      colorText = colorNames.slice(0, -1).join(', ') + ' or ' + colorNames[colorNames.length - 1];
-    }
+    const colorMap: Record<string, string> = {
+      yellow: '黃色',
+      pink: '粉紅色',
+      green: '綠色',
+      blue: '藍色',
+      orange: '橙色',
+    };
+    const colors = highlightColors.map(c => colorMap[c] || c);
+    colorDesc = colors.join('或');
   }
 
   if (mode === 'highlighted') {
-    return `You are helping a Hong Kong primary school student (ages 5-12) practice spelling.
+    // Simple Chinese prompt - like what worked with Grok
+    return `這是一張香港幼稚園及小學生學習英文的教科書或工作紙照片。
 
-CONTEXT: This is a photo of an English textbook or worksheet. A parent/teacher has used a ${colorText} HIGHLIGHTER PEN to mark vocabulary words the child needs to learn to spell.
+請幫我從這張照片中，將所有用${colorDesc}螢光筆highlight的英文字詞提取出來。
 
-YOUR TASK: Find the words marked with ${colorText} highlighter and list them.
+這些內容可能是單字（如 apple, beautiful）或詞語/句子（如 "Good morning", "Thank you"）。
 
-IMPORTANT REQUIREMENTS:
+請逐行列出每個highlight的字詞，每行一個。只需要列出字詞本身，不需要任何解釋或編號。
 
-1. ONLY output words that are:
-   - Marked with ${colorText} highlighter (look for bright ${colorText} background on text)
-   - Real English words that exist in a dictionary
-   - Suitable for primary school students to learn
-
-2. For multi-word phrases highlighted together (like "Good morning" or "Thank you"), keep them as one item
-
-3. DO NOT output:
-   - Words that are not highlighted
-   - OCR misreads or gibberish (random letter combinations)
-   - Word fragments like "ing", "tion", "ness"
-   - Very basic words like "the", "a", "is", "are"
-
-EXAMPLES OF GOOD OUTPUT:
-- apple
-- beautiful
-- Good morning
-- butterfly
-- elephant
-
-EXAMPLES OF BAD OUTPUT (never include these):
-- uit, ingi, artel, oria (not real words)
-- ing, tion, ment (word fragments)
-- tbe, wben (OCR errors)
-
-OUTPUT FORMAT:
-List each word/phrase on its own line. Nothing else.
-Example:
-apple
-beautiful
-Good morning
-
-If no highlighted words found, output exactly: NO_WORDS_FOUND`;
+如果找不到任何highlight的字詞，請回覆：NO_WORDS_FOUND`;
   }
 
-  // Smart mode - no highlights, AI picks vocabulary
-  return `You are helping a Hong Kong primary school student (ages 5-12) practice spelling.
+  // Smart mode - AI picks vocabulary
+  return `這是一張香港幼稚園及小學生學習英文的教科書或工作紙照片。
 
-CONTEXT: This is a photo of an English textbook or worksheet. Find vocabulary words that a student should learn to spell.
+請幫我識別這張照片中的重要英文生字和詞語。
 
-YOUR TASK: Identify the KEY VOCABULARY WORDS in this image.
+重點找出：
+- 粗體、放大、或特別標示的字詞
+- 生字表或詞彙框內的字詞
+- 課文中的關鍵詞彙
 
-IMPORTANT REQUIREMENTS:
+這些可能是單字（如 apple, beautiful）或詞語/句子（如 "Good morning", "Thank you"）。
 
-1. ONLY output words that are:
-   - Real English words that exist in a dictionary
-   - Suitable for primary school students to learn
-   - Important vocabulary (nouns, verbs, adjectives)
+請逐行列出每個字詞，每行一個。只需要列出字詞本身，不需要任何解釋或編號。最多20個。
 
-2. For common phrases (like "Good morning" or "Thank you"), keep them as one item
-
-3. DO NOT output:
-   - OCR misreads or gibberish
-   - Word fragments like "ing", "tion", "ness"
-   - Basic function words like "the", "a", "is", "are", "to", "of"
-   - Pronouns like "I", "you", "he", "she"
-
-4. Focus on words that appear EMPHASIZED (bold, larger, highlighted, or in vocabulary boxes)
-
-EXAMPLES OF GOOD OUTPUT:
-- apple
-- beautiful
-- running
-- butterfly
-- elephant
-
-EXAMPLES OF BAD OUTPUT (never include these):
-- uit, ingi, artel (not real words)
-- ing, tion (fragments)
-- the, is, are (too basic)
-
-OUTPUT FORMAT:
-List each word/phrase on its own line. Nothing else.
-Maximum 20 words.
-
-If no suitable vocabulary found, output exactly: NO_WORDS_FOUND`;
+如果找不到適合的字詞，請回覆：NO_WORDS_FOUND`;
 }
 
 export async function POST(request: NextRequest) {
