@@ -109,6 +109,16 @@ function breakIntoSyllables(word: string): string[] {
     return [w];
   }
 
+  // Special handling for -ies plurals (fairies, babies, stories, berries)
+  // These should split as: fair-ies, bab-ies, stor-ies, berr-ies
+  if (w.endsWith('ies') && w.length > 4) {
+    const stem = w.slice(0, -3); // Remove 'ies'
+    if (stem.length >= 2) {
+      const stemSyllables = breakRootIntoSyllables(stem);
+      return [...stemSyllables, 'ies'];
+    }
+  }
+
   // Step 1: Identify and separate suffixes first
   let remaining = w;
   const suffixParts: string[] = [];
@@ -412,8 +422,7 @@ const SYLLABLE_PRONUNCIATION: Record<string, string> = {
 
   // ========== PLURAL/VERB SUFFIXES ==========
   // Use phonetic spellings that TTS reads correctly
-  'ies': 'ease',     // fairies → fair-ease (TTS reads "eez" wrong)
-  'ries': 'reez',    // fairies split as fair-ries → "reez" (z sound)
+  'ies': 'eez',      // fairies → fair-eez, babies → bab-eez
   'ves': 'vz',       // leaves → leevz
   'es': 'iz',        // boxes → box-iz, watches → watch-iz
   'ied': 'eed',      // carried → car-eed
