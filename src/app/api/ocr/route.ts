@@ -29,72 +29,75 @@ function buildPrompt(mode: string, highlightColors?: string[]): string {
       colorText = colorNames.slice(0, -1).join(', ') + ' or ' + colorNames[colorNames.length - 1];
     }
 
-    return `You are an OCR assistant for a children's spelling practice app. The user has marked specific words with ${colorText} HIGHLIGHTER PEN.
+    return `You are an OCR assistant helping extract spelling words from HONG KONG PRIMARY SCHOOL English textbooks and worksheets.
 
-YOUR TASK: Extract ONLY the REAL ENGLISH WORDS that are highlighted with ${colorText} highlighter.
+CONTEXT: This image is from a Hong Kong kindergarten or primary school (ages 3-12) English learning material. A parent or teacher has marked specific vocabulary words with ${colorText} HIGHLIGHTER PEN for the child to practice spelling.
 
-CRITICAL INSTRUCTIONS:
-1. ONLY extract words that have ${colorText} highlighter marking on them
-2. ONLY include words that are REAL English words (exist in a dictionary)
-3. DO NOT include OCR artifacts, random letter combinations, or word fragments
-4. Ignore ALL words that are NOT highlighted
-5. List each highlighted word on its own line, wrapped with ** like **word**
-6. If a word is partially highlighted but is a real English word, include it
-7. Ignore Chinese characters, numbers, and punctuation
+YOUR TASK: Extract ONLY the words that are highlighted with ${colorText} highlighter.
 
-WHAT TO LOOK FOR:
-- Words with bright ${colorText} background/overlay (semi-transparent highlighter color)
-- Text that appears to have highlighter pen marking over it
+HOW TO IDENTIFY HIGHLIGHTED WORDS:
+- Look for words with bright ${colorText} background/overlay (semi-transparent highlighter color)
 - The highlighter color should be clearly visible on or around the text
+- Focus on words that have been deliberately marked
 
-IMPORTANT: Every word you output must be a REAL English word. Skip any OCR garbage.
+WHAT HIGHLIGHTED WORDS SHOULD LOOK LIKE:
+- Legitimate English vocabulary: apple, banana, family, school, happy, beautiful
+- Words a Hong Kong primary school student would learn
+- Real dictionary words that make sense
 
-Example output format (only highlighted REAL words):
-**apple**
-**beautiful**
-**family**
+WHAT TO SKIP (even if highlighted):
+- OCR errors or random letters (pas, lol, fos, tbe, wben)
+- Anything that doesn't look like a real English word
+- Chinese characters, numbers, or punctuation
+- If something looks like garbled text, skip it
+
+OUTPUT FORMAT:
+- List each highlighted word on its own line, wrapped with ** like **word**
+- Only include words you are confident are real English vocabulary
+
+QUALITY CHECK: Before outputting each word, ask yourself: "Is this a real English word that would appear in a Hong Kong primary school textbook?" If no, skip it.
 
 If you cannot find any ${colorText} highlighted words, respond with:
 NO_HIGHLIGHTED_WORDS_FOUND
 
-Now extract ONLY the ${colorText} highlighted words from this image:`;
+Now extract ONLY the ${colorText} highlighted vocabulary words from this image:`;
   }
 
   // Smart mode - AI picks suitable spelling words
-  return `You are an OCR assistant for a children's spelling practice app. Extract REAL English vocabulary words that are suitable for PRIMARY SCHOOL students to practice spelling.
+  return `You are an OCR assistant helping extract spelling words from HONG KONG PRIMARY SCHOOL English textbooks and worksheets.
 
-YOUR TASK: Identify and extract REAL ENGLISH WORDS that are good for spelling practice.
+CONTEXT: This image is from a Hong Kong kindergarten or primary school (ages 3-12) English learning material. The app helps children practice spelling vocabulary words from their school curriculum.
 
-CRITICAL INSTRUCTIONS:
-1. ONLY extract words that exist in an English dictionary
-2. DO NOT include:
-   - Random letter combinations or OCR artifacts (like "ey", "oria", "tbe", "wben")
-   - Partial words or word fragments
-   - Misspellings that aren't real words
-   - Common function words: the, a, an, is, are, was, were, be, been, to, of, in, for, on, with, at, by, from
-   - Pronouns: I, you, he, she, it, we, they, my, your, his, her, our, their
-   - Very short words (2 letters or less)
-3. INCLUDE these types of REAL words:
-   - Nouns: girl, boy, family, school, teacher, garden, animal
-   - Verbs: running, swimming, playing, eating, walking
-   - Adjectives: happy, beautiful, wonderful, important, different
-   - Adverbs: quickly, slowly, carefully, happily
-4. Mark KEY VOCABULARY words with ** like **word**
-5. Ignore Chinese characters, numbers, and punctuation
-6. If a word looks like OCR garbage (random letters), DO NOT include it
-7. Aim for 10-30 quality words maximum
+YOUR TASK: Extract ONLY legitimate English vocabulary words that a Hong Kong primary school student would learn.
 
-IMPORTANT: Every word you output must be a REAL English word that a child could look up in a dictionary.
+WHAT TO EXTRACT (examples of appropriate words):
+- Common nouns: apple, banana, cat, dog, family, school, teacher, friend, book, house, water, food
+- Action verbs: run, jump, play, eat, drink, sleep, read, write, swim, walk, help, like, love
+- Adjectives: big, small, happy, sad, good, bad, new, old, beautiful, wonderful, important
+- Colors: red, blue, green, yellow, pink, orange, purple, brown, black, white
+- Numbers written as words: one, two, three, four, five
+- Days/months: Monday, Tuesday, January, February
+- Body parts: head, hand, foot, eye, ear, nose, mouth
+- Weather: sunny, rainy, cloudy, hot, cold, warm
 
-Example output format:
-**beautiful**
-family
-**important**
-running
-school
-teacher
+WHAT TO SKIP (do NOT include):
+- OCR errors or random letters (pas, lol, fos, tbe, wben, oria)
+- Internet slang or abbreviations
+- Words that don't make sense
+- Very basic function words: the, a, an, is, are, to, of, in, for, on, at, by
+- Pronouns: I, you, he, she, it, we, they
+- Words shorter than 3 letters
+- Chinese characters, numbers, or punctuation
 
-Now extract suitable spelling practice words from this image:`;
+OUTPUT FORMAT:
+- List each word on its own line
+- Mark important vocabulary words with ** like **apple**
+- Only output 10-30 high-quality words
+- If unsure whether something is a real word, DO NOT include it
+
+QUALITY CHECK: Before outputting each word, ask yourself: "Would this word appear in a Hong Kong primary school English textbook?" If no, skip it.
+
+Now extract the vocabulary words from this image:`;
 }
 
 export async function POST(request: NextRequest) {
