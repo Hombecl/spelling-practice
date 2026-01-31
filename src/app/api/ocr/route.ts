@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Gemini 2.5 Flash Lite - cheapest vision model (~$0.10/1M input tokens)
-const MODEL = 'google/gemini-2.5-flash-lite-preview';
+const MODEL = 'google/gemini-2.5-flash-lite';
 
 export async function POST(request: NextRequest) {
   try {
@@ -73,9 +73,9 @@ Now extract all words from the image:`,
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenRouter API error:', errorText);
+      console.error('OpenRouter API error:', response.status, errorText);
       return NextResponse.json(
-        { error: 'Failed to process image', useLocalOCR: true },
+        { error: 'Failed to process image', detail: errorText, useLocalOCR: true },
         { status: 500 }
       );
     }
