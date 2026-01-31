@@ -16,13 +16,11 @@ const COLOR_NAMES: Record<string, string> = {
 };
 
 // ===========================================
-// TWO-STEP OCR APPROACH
-// Step 1: Extract all text with highlight markers (raw OCR)
-// Step 2: Filter and refine for valid vocabulary
+// SINGLE-STEP APPROACH: One prompt does everything
+// Gemini reads image → identifies highlights → outputs only valid vocabulary
 // ===========================================
 
-// Step 1 Prompt: Raw OCR extraction with context
-function buildStep1Prompt(mode: string, highlightColors?: string[]): string {
+function buildPrompt(mode: string, highlightColors?: string[]): string {
   let colorText = 'any color';
   if (mode === 'highlighted' && highlightColors && highlightColors.length > 0 && highlightColors.length < 5) {
     if (highlightColors.length === 1) {
@@ -34,109 +32,90 @@ function buildStep1Prompt(mode: string, highlightColors?: string[]): string {
   }
 
   if (mode === 'highlighted') {
-    return `You are an OCR assistant. Extract text from this image of an English learning worksheet.
+    return `You are helping a Hong Kong primary school student (ages 5-12) practice spelling.
 
-YOUR TASK: Identify all text that is highlighted with ${colorText} HIGHLIGHTER PEN.
+CONTEXT: This is a photo of an English textbook or worksheet. A parent/teacher has used a ${colorText} HIGHLIGHTER PEN to mark vocabulary words the child needs to learn to spell.
 
-IMPORTANT - PRESERVE PHRASES:
-- If multiple words are highlighted TOGETHER (e.g., "Thank you", "Good morning", "Little boy"), keep them as ONE phrase
-- Look for words that share the same continuous highlight marking
-- Common phrases to look for: "Thank you", "Good morning", "Good night", "How are you", "I love you", "Little boy", "Little girl", "Big dog", etc.
+YOUR TASK: Find the words marked with ${colorText} highlighter and list them.
 
-OUTPUT FORMAT (use exactly this format):
-For each highlighted item, output on its own line:
-[HIGHLIGHT] word or phrase here
+IMPORTANT REQUIREMENTS:
 
-Examples:
-[HIGHLIGHT] Thank you
-[HIGHLIGHT] beautiful
-[HIGHLIGHT] Little boy
-[HIGHLIGHT] apple
+1. ONLY output words that are:
+   - Marked with ${colorText} highlighter (look for bright ${colorText} background on text)
+   - Real English words that exist in a dictionary
+   - Suitable for primary school students to learn
 
-RULES:
-1. Include ALL highlighted text, even if you're unsure about some words
-2. Preserve multi-word phrases that are highlighted together
-3. Include the exact text as you see it (we will filter later)
-4. If nothing is highlighted, output: NO_HIGHLIGHTS_FOUND
+2. For multi-word phrases highlighted together (like "Good morning" or "Thank you"), keep them as one item
 
-Now extract all ${colorText} highlighted text from this image:`;
-  }
+3. DO NOT output:
+   - Words that are not highlighted
+   - OCR misreads or gibberish (random letter combinations)
+   - Word fragments like "ing", "tion", "ness"
+   - Very basic words like "the", "a", "is", "are"
 
-  // Smart mode
-  return `You are an OCR assistant. Extract text from this image of an English learning worksheet.
+EXAMPLES OF GOOD OUTPUT:
+- apple
+- beautiful
+- Good morning
+- butterfly
+- elephant
 
-YOUR TASK: Identify vocabulary words and phrases that appear to be key learning content.
-
-IMPORTANT - PRESERVE PHRASES:
-- If words appear together as a phrase (e.g., "Thank you", "Good morning"), keep them as ONE phrase
-- Look for common English phrases children learn
-- Common phrases: "Thank you", "Good morning", "Good night", "How are you", "I love you", etc.
-
-OUTPUT FORMAT (use exactly this format):
-For each vocabulary item, output on its own line:
-[VOCAB] word or phrase here
-
-Mark items that appear emphasized (bold, larger, highlighted) with [EMPHASIS]:
-[VOCAB][EMPHASIS] important word
-
-Examples:
-[VOCAB][EMPHASIS] Thank you
-[VOCAB] beautiful
-[VOCAB][EMPHASIS] Little boy
-[VOCAB] apple
-
-RULES:
-1. Include vocabulary words that students would learn to spell
-2. Preserve multi-word phrases
-3. Include the exact text as you see it
-
-Now extract vocabulary from this image:`;
-}
-
-// Step 2 Prompt: Filter and validate
-function buildStep2Prompt(rawOcrOutput: string): string {
-  return `You are a vocabulary filter for a Hong Kong kindergarten/primary school (ages 3-8) English spelling practice app.
-
-I just ran OCR on a children's English worksheet. Here is the raw output:
-
----
-${rawOcrOutput}
----
-
-YOUR TASK: Filter this list to include ONLY valid vocabulary that primary school students should learn to spell.
-
-FILTERING RULES:
-
-1. KEEP these types of words/phrases:
-   - Real English dictionary words: apple, banana, beautiful, elephant
-   - Common phrases children learn: "Thank you", "Good morning", "I love you"
-   - Compound terms: "ice cream", "hot dog", "birthday cake"
-   - Action words: running, jumping, swimming
-   - Descriptive words: happy, sad, beautiful, wonderful
-
-2. REMOVE these:
-   - OCR errors/nonsense: uit, ingi, artel, oria, tbe, wben, fos, pas
-   - Word fragments: ing, tion, ness, ment
-   - Function words alone: the, a, an, is, are, to, of, in
-   - Single letters or very short fragments
-   - Anything that is NOT a real English word or phrase
-
-3. For phrases:
-   - Keep meaningful phrases: "Thank you" ✓, "Good morning" ✓
-   - Split if not a real phrase: "the apple" → just "apple"
+EXAMPLES OF BAD OUTPUT (never include these):
+- uit, ingi, artel, oria (not real words)
+- ing, tion, ment (word fragments)
+- tbe, wben (OCR errors)
 
 OUTPUT FORMAT:
-List each valid word or phrase on its own line, wrapped with ** like:
-**apple**
-**Thank you**
-**beautiful**
-**ice cream**
+List each word/phrase on its own line. Nothing else.
+Example:
+apple
+beautiful
+Good morning
 
-Maximum 25 items. Only include items you are CERTAIN are real English vocabulary.
+If no highlighted words found, output exactly: NO_WORDS_FOUND`;
+  }
 
-If nothing valid remains, output: NO_VALID_VOCABULARY
+  // Smart mode - no highlights, AI picks vocabulary
+  return `You are helping a Hong Kong primary school student (ages 5-12) practice spelling.
 
-Now filter the vocabulary:`;
+CONTEXT: This is a photo of an English textbook or worksheet. Find vocabulary words that a student should learn to spell.
+
+YOUR TASK: Identify the KEY VOCABULARY WORDS in this image.
+
+IMPORTANT REQUIREMENTS:
+
+1. ONLY output words that are:
+   - Real English words that exist in a dictionary
+   - Suitable for primary school students to learn
+   - Important vocabulary (nouns, verbs, adjectives)
+
+2. For common phrases (like "Good morning" or "Thank you"), keep them as one item
+
+3. DO NOT output:
+   - OCR misreads or gibberish
+   - Word fragments like "ing", "tion", "ness"
+   - Basic function words like "the", "a", "is", "are", "to", "of"
+   - Pronouns like "I", "you", "he", "she"
+
+4. Focus on words that appear EMPHASIZED (bold, larger, highlighted, or in vocabulary boxes)
+
+EXAMPLES OF GOOD OUTPUT:
+- apple
+- beautiful
+- running
+- butterfly
+- elephant
+
+EXAMPLES OF BAD OUTPUT (never include these):
+- uit, ingi, artel (not real words)
+- ing, tion (fragments)
+- the, is, are (too basic)
+
+OUTPUT FORMAT:
+List each word/phrase on its own line. Nothing else.
+Maximum 20 words.
+
+If no suitable vocabulary found, output exactly: NO_WORDS_FOUND`;
 }
 
 export async function POST(request: NextRequest) {
@@ -155,19 +134,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ===========================================
-    // STEP 1: Raw OCR extraction with context
-    // ===========================================
-    const step1Prompt = buildStep1Prompt(mode, highlightColors);
+    // Single-step: Gemini does OCR + filtering in one go
+    const prompt = buildPrompt(mode, highlightColors);
 
-    console.log('[OCR] Step 1: Raw extraction...');
-    const step1Response = await fetch(OPENROUTER_API_URL, {
+    console.log('[OCR] Calling Gemini with mode:', mode);
+    const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://spelling-practice.vercel.app',
-        'X-Title': 'Spelling Practice OCR - Step 1',
+        'X-Title': 'Spelling Practice OCR',
       },
       body: JSON.stringify({
         model: MODEL,
@@ -183,61 +160,9 @@ export async function POST(request: NextRequest) {
               },
               {
                 type: 'text',
-                text: step1Prompt,
+                text: prompt,
               },
             ],
-          },
-        ],
-        max_tokens: 2000,
-        temperature: 0,
-      }),
-    });
-
-    if (!step1Response.ok) {
-      const errorText = await step1Response.text();
-      console.error('OpenRouter API error (Step 1):', step1Response.status, errorText);
-      return NextResponse.json(
-        { error: 'Failed to process image', detail: errorText, useLocalOCR: true },
-        { status: 500 }
-      );
-    }
-
-    const step1Result = await step1Response.json();
-    const rawOcrOutput = step1Result.choices?.[0]?.message?.content || '';
-
-    console.log('[OCR] Step 1 raw output:', rawOcrOutput.substring(0, 500));
-
-    // Check for no highlights found
-    if (rawOcrOutput.includes('NO_HIGHLIGHTS_FOUND')) {
-      return NextResponse.json({
-        success: true,
-        words: [],
-        highlightedWords: [],
-        rawText: rawOcrOutput,
-        source: 'gemini-ocr',
-      });
-    }
-
-    // ===========================================
-    // STEP 2: Filter and validate vocabulary
-    // ===========================================
-    const step2Prompt = buildStep2Prompt(rawOcrOutput);
-
-    console.log('[OCR] Step 2: Filtering vocabulary...');
-    const step2Response = await fetch(OPENROUTER_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://spelling-practice.vercel.app',
-        'X-Title': 'Spelling Practice OCR - Step 2',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          {
-            role: 'user',
-            content: step2Prompt,
           },
         ],
         max_tokens: 1000,
@@ -245,44 +170,39 @@ export async function POST(request: NextRequest) {
       }),
     });
 
-    if (!step2Response.ok) {
-      const errorText = await step2Response.text();
-      console.error('OpenRouter API error (Step 2):', step2Response.status, errorText);
-      // Fall back to parsing step 1 output directly
-      const { words, highlightedWords } = parseOCRResponse(rawOcrOutput, mode);
-      return NextResponse.json({
-        success: true,
-        words,
-        highlightedWords,
-        rawText: rawOcrOutput,
-        source: 'gemini-ocr',
-      });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenRouter API error:', response.status, errorText);
+      return NextResponse.json(
+        { error: 'Failed to process image', detail: errorText, useLocalOCR: true },
+        { status: 500 }
+      );
     }
 
-    const step2Result = await step2Response.json();
-    const filteredOutput = step2Result.choices?.[0]?.message?.content || '';
+    const result = await response.json();
+    const rawOutput = result.choices?.[0]?.message?.content || '';
 
-    console.log('[OCR] Step 2 filtered output:', filteredOutput.substring(0, 500));
+    console.log('[OCR] Gemini output:', rawOutput);
 
-    // Check for no valid vocabulary
-    if (filteredOutput.includes('NO_VALID_VOCABULARY')) {
+    // Check for no words found
+    if (rawOutput.includes('NO_WORDS_FOUND')) {
       return NextResponse.json({
         success: true,
         words: [],
         highlightedWords: [],
-        rawText: `Step 1:\n${rawOcrOutput}\n\nStep 2:\n${filteredOutput}`,
+        rawText: rawOutput,
         source: 'gemini-ocr',
       });
     }
 
-    // Parse the final filtered output
-    const { words, highlightedWords } = parseOCRResponse(filteredOutput, mode);
+    // Parse the simple line-by-line output
+    const { words, highlightedWords } = parseSimpleOutput(rawOutput, mode);
 
     return NextResponse.json({
       success: true,
       words,
       highlightedWords,
-      rawText: `Step 1:\n${rawOcrOutput}\n\nStep 2:\n${filteredOutput}`,
+      rawText: rawOutput,
       source: 'gemini-ocr',
     });
   } catch (error) {
@@ -321,127 +241,55 @@ const GARBAGE_WORDS = new Set([
   'ght', 'nge', 'ple', 'ble', 'dle', 'tle', 'gle', 'fle', 'sle',
 ]);
 
-// Check if a word looks like a valid English word
-function isValidEnglishWord(word: string): boolean {
-  // Must be at least 3 characters (skip 2-letter words like "ey")
-  if (word.length < 3) return false;
-
-  // Must only contain letters
-  if (!/^[a-zA-Z]+$/.test(word)) return false;
-
-  // Must have at least one vowel
-  if (!/[aeiou]/i.test(word)) return false;
-
-  // Check against known garbage words
-  if (GARBAGE_WORDS.has(word.toLowerCase())) return false;
-
-  // Skip words that are just vowels or consonants repeated
-  if (/^(.)\1+$/.test(word)) return false;
-
-  // Skip words with too many consecutive consonants (likely OCR errors)
-  if (/[bcdfghjklmnpqrstvwxyz]{5,}/i.test(word)) return false;
-
-  // Skip words with too many consecutive vowels (likely OCR errors)
-  if (/[aeiou]{4,}/i.test(word)) return false;
-
-  // Common OCR garbage patterns to skip
-  if (/^[aeiou]{2,3}$/i.test(word)) return false;  // Just 2-3 vowels like "ey", "oa"
-  if (/^[bcdfghjklmnpqrstvwxyz]{2,3}$/i.test(word)) return false;  // Just consonants
-
-  // Skip words that look like suffixes/prefixes only
-  if (/^(un|re|de|pre|pro|anti|dis|mis|non|sub|super|over|under|out|up|down|fore|post|mid|semi|self|co|ex|bi|tri|multi|poly|mono|uni|omni|pan|auto|pseudo|neo|proto|meta|para|ultra|infra|intra|inter|trans|extra|hyper|hypo)$/i.test(word)) return false;
-
-  // Skip words that are just common suffixes
-  if (/^(ing|tion|sion|ness|ment|able|ible|ful|less|ous|ive|al|ly|er|est|ed|en|ity|ty|ry|ary|ory|ery)$/i.test(word)) return false;
-
-  return true;
-}
-
-// Parse the OCR response to extract words/phrases and highlighted items
-function parseOCRResponse(text: string, mode: string): { words: string[]; highlightedWords: string[] } {
+// Parse simple line-by-line output from Gemini
+function parseSimpleOutput(text: string, mode: string): { words: string[]; highlightedWords: string[] } {
   const words: string[] = [];
-  const highlightedWords: string[] = [];
   const seen = new Set<string>();
 
-  // Log raw response for debugging
-  console.log('[OCR] Parsing response:', text.substring(0, 300));
-
-  // Split by lines and process each
+  // Split by lines
   const lines = text.split(/[\n\r]+/);
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
+    let phrase = line.trim();
+    if (!phrase) continue;
 
-    // Skip explanatory text
-    if (trimmed.startsWith('#')) continue;
-    if (trimmed.toLowerCase().includes('no valid') || trimmed.toLowerCase().includes('no highlight')) continue;
+    // Skip if it looks like instructions or explanations
+    if (phrase.includes(':') && phrase.length > 30) continue;
+    if (phrase.toLowerCase().includes('no_words') || phrase.toLowerCase().includes('no words')) continue;
+    if (phrase.startsWith('#') || phrase.startsWith('*')) continue;
 
-    // Check for markers from our two-step process
-    const isHighlightMarked = trimmed.includes('[HIGHLIGHT]') || trimmed.includes('[EMPHASIS]');
-    const isVocabMarked = trimmed.includes('[VOCAB]');
-    const isStarMarked = trimmed.startsWith('**') && trimmed.endsWith('**');
+    // Remove common prefixes like "- ", "• ", "1. "
+    phrase = phrase.replace(/^[\-\•\*\d\.]+\s*/, '');
 
-    // Extract the phrase/word
-    let phrase = trimmed;
+    // Remove any remaining non-letter characters at start/end
+    phrase = phrase.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z\s]+$/, '');
 
-    // Remove markers
-    phrase = phrase.replace(/\[HIGHLIGHT\]/gi, '');
-    phrase = phrase.replace(/\[VOCAB\]/gi, '');
-    phrase = phrase.replace(/\[EMPHASIS\]/gi, '');
-    phrase = phrase.replace(/^\*\*|\*\*$/g, '');
-    phrase = phrase.trim();
+    // Clean internal spaces (normalize multiple spaces)
+    phrase = phrase.replace(/\s+/g, ' ').trim();
 
-    // Remove list markers like "1.", "•", "-" at the start
-    phrase = phrase.replace(/^[\d\.\-\•\*]+\s*/, '');
-
-    // Clean up: remove leading/trailing punctuation but preserve internal spaces for phrases
-    phrase = phrase.replace(/^[^a-zA-Z]+/, '').replace(/[^a-zA-Z]+$/, '');
-
-    // Skip if empty or too short
     if (!phrase || phrase.length < 2) continue;
 
-    // Normalize: lowercase for comparison
-    const normalizedPhrase = phrase.toLowerCase();
+    // Normalize to lowercase for deduplication
+    const normalized = phrase.toLowerCase();
+    if (seen.has(normalized)) continue;
 
-    // Skip if already seen
-    if (seen.has(normalizedPhrase)) continue;
+    // Basic validation: must contain letters, not too long
+    if (!/[a-zA-Z]/.test(phrase)) continue;
+    if (phrase.split(/\s+/).length > 4) continue; // Max 4 words
 
-    // Validate: for single words, use isValidEnglishWord
-    // For phrases (contains space), do basic validation
-    const wordCount = phrase.split(/\s+/).length;
+    // Skip known garbage words (backup filter)
+    if (GARBAGE_WORDS.has(normalized)) continue;
 
-    if (wordCount === 1) {
-      // Single word validation
-      if (!isValidEnglishWord(phrase)) continue;
-    } else {
-      // Multi-word phrase validation
-      // Check if it looks like a valid phrase (each word should have letters)
-      const phraseWords = phrase.split(/\s+/);
-      const allWordsValid = phraseWords.every(w => /^[a-zA-Z]+$/.test(w) && w.length >= 1);
-      if (!allWordsValid) continue;
-
-      // Skip if phrase is too long (more than 4 words is likely a sentence)
-      if (wordCount > 4) continue;
-    }
-
-    seen.add(normalizedPhrase);
-    words.push(phrase.toLowerCase());
-
-    // Determine if highlighted
-    if (mode === 'highlighted' || isHighlightMarked || isStarMarked) {
-      highlightedWords.push(phrase.toLowerCase());
-    } else if (isVocabMarked) {
-      // In smart mode, vocab items are added but not necessarily highlighted
-      // unless they also have emphasis
-      if (trimmed.includes('[EMPHASIS]')) {
-        highlightedWords.push(phrase.toLowerCase());
-      }
-    }
+    seen.add(normalized);
+    words.push(normalized);
   }
 
-  console.log('[OCR] Parsed words:', words.length, 'Highlighted:', highlightedWords.length);
-  console.log('[OCR] Words:', words.slice(0, 10));
+  console.log('[OCR] Parsed words:', words);
 
-  return { words, highlightedWords };
+  // In highlighted mode, all words are considered highlighted
+  // In smart mode, all words are vocabulary
+  return {
+    words,
+    highlightedWords: mode === 'highlighted' ? words : [],
+  };
 }
