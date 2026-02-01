@@ -35,6 +35,15 @@ import {
 } from '@/lib/progress';
 import { Word } from '@/lib/words';
 import { CustomWordList, markWordListUsed } from '@/lib/customWords';
+import {
+  getCurrentSession,
+  logout,
+  loadProgressFromCloud,
+  saveProgressToCloud,
+  AuthUser,
+} from '@/lib/auth';
+import { isSupabaseConfigured } from '@/lib/supabase';
+import LoginScreen from '@/components/auth/LoginScreen';
 import PhonicsMode from '@/components/modes/PhonicsMode';
 import FillMode from '@/components/modes/FillMode';
 import SpellMode from '@/components/modes/SpellMode';
@@ -43,7 +52,7 @@ import WordListManager from '@/components/WordListManager';
 import BadgeDisplay from '@/components/BadgeDisplay';
 import ProgressBar from '@/components/ProgressBar';
 
-type Screen = 'home' | 'play' | 'badges' | 'wordlists' | 'pet';
+type Screen = 'login' | 'home' | 'play' | 'badges' | 'wordlists' | 'pet';
 
 // Built-in words for different levels
 const builtInWords = {
@@ -55,7 +64,9 @@ const builtInWords = {
 export default function Home() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
-  const [screen, setScreen] = useState<Screen>('home');
+  const [screen, setScreen] = useState<Screen>('login');
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isGuest, setIsGuest] = useState(false);
   const [wordsCompleted, setWordsCompleted] = useState(0);
   const [sessionTarget, setSessionTarget] = useState(10);
   const [customList, setCustomList] = useState<CustomWordList | null>(null);
@@ -73,12 +84,90 @@ export default function Home() {
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [showFoodReward, setShowFoodReward] = useState<{ type: string; emoji: string } | null>(null);
 
-  // Load progress on mount
-  useEffect(() => {
+  // Helper: Save progress locally and to cloud if logged in
+  const saveProgressWithSync = useCallback((newProgress: UserProgress) => {
+    saveProgress(newProgress);
+    if (currentUser) {
+      saveProgressToCloud(currentUser.id, newProgress);
+    }
+  }, [currentUser]);
+
+  // Auth handlers
+  const handleLogin = async (user: AuthUser) => {
+    setCurrentUser(user);
+    setIsGuest(false);
+
+    // Load progress from cloud
+    const cloudProgress = await loadProgressFromCloud(user.id);
+    if (cloudProgress) {
+      const updatedP = updateStreak(cloudProgress);
+      setProgress(updatedP);
+      saveProgress(updatedP);
+    } else {
+      // First time user or no cloud data - use local and sync to cloud
+      const p = getProgress();
+      const updatedP = updateStreak(p);
+      setProgress(updatedP);
+      saveProgress(updatedP);
+      saveProgressToCloud(user.id, updatedP);
+    }
+
+    setScreen('home');
+  };
+
+  const handleSkipLogin = () => {
+    setIsGuest(true);
     const p = getProgress();
     const updatedP = updateStreak(p);
     setProgress(updatedP);
     saveProgress(updatedP);
+    setScreen('home');
+  };
+
+  const handleLogout = () => {
+    logout();
+    setCurrentUser(null);
+    setIsGuest(false);
+    setScreen('login');
+  };
+
+  // Check for existing session and load progress on mount
+  useEffect(() => {
+    const initApp = async () => {
+      // Check for existing session
+      const session = getCurrentSession();
+
+      if (session) {
+        setCurrentUser(session);
+        // Try to load from cloud
+        const cloudProgress = await loadProgressFromCloud(session.id);
+        if (cloudProgress) {
+          const updatedP = updateStreak(cloudProgress);
+          setProgress(updatedP);
+          saveProgress(updatedP);
+          // Also save to cloud
+          saveProgressToCloud(session.id, updatedP);
+        } else {
+          // No cloud data, use local
+          const p = getProgress();
+          const updatedP = updateStreak(p);
+          setProgress(updatedP);
+          saveProgress(updatedP);
+        }
+        setScreen('home');
+      } else if (!isSupabaseConfigured()) {
+        // No Supabase configured, go directly to guest mode
+        setIsGuest(true);
+        const p = getProgress();
+        const updatedP = updateStreak(p);
+        setProgress(updatedP);
+        saveProgress(updatedP);
+        setScreen('home');
+      }
+      // Otherwise stay on login screen
+    };
+
+    initApp();
   }, []);
 
   // Get words based on selection
@@ -182,7 +271,7 @@ export default function Home() {
     }
 
     setProgress(newProgress);
-    saveProgress(newProgress);
+    saveProgressWithSync(newProgress);
     setWordsCompleted((prev) => prev + 1);
 
     setTimeout(() => {
@@ -200,7 +289,7 @@ export default function Home() {
     if (!progress) return;
     const newProgress = { ...progress, currentMode: mode };
     setProgress(newProgress);
-    saveProgress(newProgress);
+    saveProgressWithSync(newProgress);
   };
 
   // Handle custom list selection
@@ -246,7 +335,7 @@ export default function Home() {
     // Activate the skill effect
     const newProgress = activateSkill(skillId, progress);
     setProgress(newProgress);
-    saveProgress(newProgress);
+    saveProgressWithSync(newProgress);
 
     setSkillUsedMessage(`${skill.emoji} 顯示咗 ${newRevealed.length} 個字母！`);
     setTimeout(() => setSkillUsedMessage(null), 2000);
@@ -256,6 +345,11 @@ export default function Home() {
   const resetHints = useCallback(() => {
     setHintLetters([]);
   }, []);
+
+  // Show login screen
+  if (screen === 'login') {
+    return <LoginScreen onLogin={handleLogin} onSkip={handleSkipLogin} />;
+  }
 
   if (!progress) {
     return (
@@ -308,6 +402,24 @@ export default function Home() {
             >
               🏅
             </button>
+
+            {/* User/Login button */}
+            {currentUser ? (
+              <button
+                onClick={handleLogout}
+                className="text-xs bg-purple-100 hover:bg-purple-200 px-2 py-1 rounded-full text-purple-700 font-bold transition-colors"
+                title="登出"
+              >
+                {currentUser.displayName.slice(0, 4)}
+              </button>
+            ) : isGuest ? (
+              <button
+                onClick={() => setScreen('login')}
+                className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-full text-gray-600 transition-colors"
+              >
+                登入
+              </button>
+            ) : null}
           </div>
         </div>
       </header>
@@ -502,7 +614,7 @@ export default function Home() {
                     const { progress: newProgress, result } = patPet(progress);
                     if (result.success) {
                       setProgress(newProgress);
-                      saveProgress(newProgress);
+                      saveProgressWithSync(newProgress);
                       setPatAnimation(result.response.animation);
                       setPetSpeech(result.response.message);
                       setInteractionMessage(`+${result.happinessGained} 開心 ${result.response.emoji}`);
@@ -621,7 +733,7 @@ export default function Home() {
                             const { progress: newProgress, result } = completeDailyTask(task.id, progress);
                             if (result) {
                               setProgress(newProgress);
-                              saveProgress(newProgress);
+                              saveProgressWithSync(newProgress);
                               setPetSpeech(`${task.emoji} ${task.nameZh} 完成！謝謝你！`);
                               setInteractionMessage(`+${result.xpGained} XP +${result.happinessGained} 開心`);
                               setTimeout(() => {
@@ -665,7 +777,7 @@ export default function Home() {
                             );
                             if (result.success) {
                               setProgress(newProgress);
-                              saveProgress(newProgress);
+                              saveProgressWithSync(newProgress);
                               setPetSpeech(result.message);
                               setInteractionMessage(`+${result.happinessGained} 開心 +${result.xpGained} XP`);
                               setTimeout(() => {
@@ -833,7 +945,7 @@ export default function Home() {
                   if (newPetName.trim()) {
                     const newProgress = renamePet(newPetName.trim(), progress);
                     setProgress(newProgress);
-                    saveProgress(newProgress);
+                    saveProgressWithSync(newProgress);
                   }
                   setShowRenameModal(false);
                 }}
