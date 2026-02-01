@@ -206,6 +206,21 @@ body {
   animation: scale-in 0.3s ease-out forwards;
 }
 
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.01);
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
 /* Larger touch targets for children - mobile optimized */
 button {
   min-height: 44px;

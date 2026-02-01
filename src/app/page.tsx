@@ -32,6 +32,16 @@ import {
   FOOD_TYPES,
   DAILY_TASKS,
   MAX_PATS_PER_DAY,
+  // Events & Items imports
+  getEventById,
+  isEventExpired,
+  ITEMS,
+  getShopItems,
+  calculateItemDrop,
+  useItem,
+  buyItem,
+  hasItem,
+  addItemToInventory,
 } from '@/lib/progress';
 import { Word } from '@/lib/words';
 import { CustomWordList, markWordListUsed } from '@/lib/customWords';
@@ -52,7 +62,7 @@ import WordListManager from '@/components/WordListManager';
 import BadgeDisplay from '@/components/BadgeDisplay';
 import ProgressBar from '@/components/ProgressBar';
 
-type Screen = 'login' | 'home' | 'play' | 'badges' | 'wordlists' | 'pet';
+type Screen = 'login' | 'home' | 'play' | 'badges' | 'wordlists' | 'pet' | 'shop';
 
 // Built-in words for different levels
 const builtInWords = {
@@ -83,6 +93,8 @@ export default function Home() {
   const [patAnimation, setPatAnimation] = useState<string | null>(null);
   const [interactionMessage, setInteractionMessage] = useState<string | null>(null);
   const [showFoodReward, setShowFoodReward] = useState<{ type: string; emoji: string } | null>(null);
+  const [showItemDrop, setShowItemDrop] = useState<{ nameZh: string; emoji: string } | null>(null);
+  const [itemUseMessage, setItemUseMessage] = useState<string | null>(null);
 
   // Helper: Save progress locally and to cloud if logged in
   const saveProgressWithSync = useCallback((newProgress: UserProgress) => {
@@ -267,6 +279,22 @@ export default function Home() {
         const foodInfo = FOOD_TYPES[foodReward.type];
         setShowFoodReward({ type: foodReward.type, emoji: foodInfo.emoji });
         setTimeout(() => setShowFoodReward(null), 2000);
+      }
+
+      // Check for item drops
+      const hasLuckyCharm = newProgress.pet.equippedItems.includes('lucky_charm');
+      const itemDrop = calculateItemDrop(starsEarned, hasLuckyCharm);
+      if (itemDrop) {
+        newProgress = {
+          ...newProgress,
+          pet: {
+            ...newProgress.pet,
+            itemInventory: addItemToInventory(newProgress.pet.itemInventory, itemDrop.id),
+          },
+        };
+        // Show item drop notification
+        setShowItemDrop({ nameZh: itemDrop.nameZh, emoji: itemDrop.emoji });
+        setTimeout(() => setShowItemDrop(null), 2500);
       }
     }
 
@@ -799,6 +827,38 @@ export default function Home() {
                 );
               })()}
 
+              {/* Active Event Banner */}
+              {(() => {
+                const activeEvent = progress.pet.activeEvent;
+                if (!activeEvent || isEventExpired(activeEvent)) return null;
+                const event = getEventById(activeEvent.eventId);
+                if (!event) return null;
+
+                const expiresAt = new Date(activeEvent.expiresAt);
+                const now = new Date();
+                const hoursLeft = Math.max(0, Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60)));
+
+                return (
+                  <div className="w-full max-w-sm bg-gradient-to-r from-indigo-100 to-purple-100 border-2 border-indigo-300 rounded-xl p-4 animate-pulse-slow">
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl">{event.emoji}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-indigo-800">{event.nameZh}</div>
+                        <div className="text-xs text-indigo-600">{event.descriptionZh}</div>
+                        <div className="text-xs text-indigo-500 mt-1">
+                          {hoursLeft > 0 ? `剩餘 ${hoursLeft} 小時` : '快將結束'}
+                          {event.effects.xpMultiplier && ` · XP x${event.effects.xpMultiplier}`}
+                          {event.effects.happinessMultiplier && ` · 開心度 x${event.effects.happinessMultiplier}`}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-sm text-indigo-700 italic">
+                      &ldquo;{event.petResponse}&rdquo;
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
                 <div className="bg-white rounded-xl p-3 text-center shadow-md">
@@ -817,6 +877,79 @@ export default function Home() {
                   <div className="text-xs text-gray-500">技能</div>
                 </div>
               </div>
+
+              {/* Item Inventory */}
+              {(() => {
+                const inventory = progress.pet.itemInventory || [];
+                if (inventory.length === 0) return null;
+                return (
+                  <div className="w-full max-w-sm">
+                    <h3 className="text-lg font-bold text-gray-700 mb-2">道具背包 🎒</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                      {inventory.map((invItem, idx) => {
+                        const item = ITEMS[invItem.itemId];
+                        if (!item) return null;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              const result = useItem(invItem.itemId, progress.pet);
+                              if (result.success) {
+                                const newProgress = {
+                                  ...progress,
+                                  pet: result.pet,
+                                  totalXP: progress.totalXP + (item.effects.xpBoost || 0),
+                                };
+                                setProgress(newProgress);
+                                saveProgressWithSync(newProgress);
+                                setItemUseMessage(result.message);
+                                setTimeout(() => setItemUseMessage(null), 2500);
+                              } else {
+                                setItemUseMessage(result.message);
+                                setTimeout(() => setItemUseMessage(null), 2000);
+                              }
+                            }}
+                            className={`
+                              relative flex flex-col items-center p-2 rounded-xl transition-all hover:scale-105
+                              ${item.rarity === 'legendary' ? 'bg-yellow-100 border-2 border-yellow-400' :
+                                item.rarity === 'rare' ? 'bg-purple-100 border-2 border-purple-300' :
+                                item.rarity === 'uncommon' ? 'bg-blue-100 border-2 border-blue-300' :
+                                'bg-gray-100 border border-gray-300'}
+                            `}
+                            title={`${item.nameZh}: ${item.descriptionZh}`}
+                          >
+                            <span className="text-2xl">{item.emoji}</span>
+                            <span className="text-xs font-bold text-gray-600 truncate w-full text-center">{item.nameZh.slice(0, 4)}</span>
+                            <span className="absolute -top-1 -right-1 bg-gray-800 text-white text-xs px-1.5 rounded-full">
+                              {invItem.quantity}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">撳道具使用</p>
+                  </div>
+                );
+              })()}
+
+              {/* Item Use Message */}
+              {itemUseMessage && (
+                <div className="w-full max-w-sm">
+                  <div className="bg-green-100 border border-green-300 rounded-xl p-3 text-center text-green-700 font-medium animate-bounce-in">
+                    {itemUseMessage}
+                  </div>
+                </div>
+              )}
+
+              {/* Shop Button */}
+              <button
+                onClick={() => setScreen('shop')}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 text-white font-bold rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all"
+              >
+                <span className="text-xl">🏪</span>
+                <span>星星商店</span>
+                <span className="bg-white/30 px-2 py-0.5 rounded-full text-sm">⭐ {progress.totalStars}</span>
+              </button>
 
               {/* Skills Section */}
               {progress.pet.unlockedSkills.length > 0 && (
@@ -866,6 +999,116 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {screen === 'shop' && (
+          <div className="py-4 sm:py-8">
+            <button
+              onClick={() => setScreen('pet')}
+              className="mb-4 px-4 py-2 text-blue-500 hover:text-blue-700 active:text-blue-900 text-lg"
+            >
+              ← 返回
+            </button>
+
+            <div className="flex flex-col items-center gap-6">
+              {/* Shop Header */}
+              <div className="text-center">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                  🏪 星星商店
+                </h1>
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <span className="text-yellow-500 text-2xl">⭐</span>
+                  <span className="text-2xl font-bold text-yellow-600">{progress.totalStars}</span>
+                  <span className="text-gray-500">粒星星</span>
+                </div>
+              </div>
+
+              {/* Shop Items */}
+              <div className="w-full max-w-md space-y-3">
+                {getShopItems().map(item => {
+                  const canAfford = progress.totalStars >= (item.shopPrice || 0);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`
+                        flex items-center gap-3 p-4 rounded-xl transition-all
+                        ${item.rarity === 'legendary' ? 'bg-gradient-to-r from-yellow-100 to-amber-100 border-2 border-yellow-400' :
+                          item.rarity === 'rare' ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-300' :
+                          item.rarity === 'uncommon' ? 'bg-blue-50 border-2 border-blue-300' :
+                          'bg-white border border-gray-200'}
+                      `}
+                    >
+                      <span className="text-4xl">{item.emoji}</span>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-gray-800">{item.nameZh}</span>
+                          <span className={`
+                            text-xs px-2 py-0.5 rounded-full
+                            ${item.rarity === 'legendary' ? 'bg-yellow-200 text-yellow-800' :
+                              item.rarity === 'rare' ? 'bg-purple-200 text-purple-800' :
+                              item.rarity === 'uncommon' ? 'bg-blue-200 text-blue-800' :
+                              'bg-gray-200 text-gray-600'}
+                          `}>
+                            {item.rarity === 'legendary' ? '傳說' :
+                             item.rarity === 'rare' ? '稀有' :
+                             item.rarity === 'uncommon' ? '優良' : '普通'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">{item.descriptionZh}</div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const result = buyItem(item.id, progress.totalStars, progress.pet.itemInventory);
+                          if (result.success) {
+                            const newProgress = {
+                              ...progress,
+                              totalStars: result.newStars,
+                              pet: {
+                                ...progress.pet,
+                                itemInventory: result.newInventory,
+                              },
+                            };
+                            setProgress(newProgress);
+                            saveProgressWithSync(newProgress);
+                            setItemUseMessage(result.message);
+                            setTimeout(() => setItemUseMessage(null), 2000);
+                          } else {
+                            setItemUseMessage(result.message);
+                            setTimeout(() => setItemUseMessage(null), 2000);
+                          }
+                        }}
+                        disabled={!canAfford}
+                        className={`
+                          flex items-center gap-1 px-4 py-2 rounded-full font-bold transition-all
+                          ${canAfford
+                            ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900 active:scale-95'
+                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                        `}
+                      >
+                        <span>⭐</span>
+                        <span>{item.shopPrice}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Purchase Message */}
+              {itemUseMessage && (
+                <div className="bg-green-100 border border-green-300 rounded-xl p-3 text-center text-green-700 font-medium animate-bounce-in">
+                  {itemUseMessage}
+                </div>
+              )}
+
+              {/* Tips */}
+              <div className="bg-purple-50 rounded-xl p-4 max-w-md">
+                <p className="text-sm text-purple-700 text-center">
+                  💡 練習串字可以獲得星星同道具掉落！<br />
+                  三星完成嘅機會最高！
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* XP Gain Animation */}
@@ -873,6 +1116,18 @@ export default function Home() {
         <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
           <div className="animate-xp-float text-2xl sm:text-3xl font-bold text-purple-600 bg-purple-100 px-4 py-2 rounded-full shadow-lg">
             +{xpGained} XP ✨
+          </div>
+        </div>
+      )}
+
+      {/* Item Drop Animation */}
+      {showItemDrop && (
+        <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
+          <div className="animate-scale-in text-center">
+            <div className="text-6xl mb-2">{showItemDrop.emoji}</div>
+            <div className="bg-gradient-to-r from-yellow-400 to-orange-400 text-white font-bold px-4 py-2 rounded-full shadow-lg">
+              獲得 {showItemDrop.nameZh}！
+            </div>
           </div>
         </div>
       )}

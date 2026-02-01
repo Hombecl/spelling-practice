@@ -96,6 +96,34 @@ export interface PetState {
   lastInteractionTime: string; // For cooldowns
   dailyTasksCompleted: string[]; // IDs of completed daily tasks
   lastDailyTaskDate: string;   // For resetting daily tasks
+
+  // Events & Items system
+  activeEvent: ActiveEvent | null;  // Current active event
+  lastEventDate: string;            // For event cooldown
+  itemInventory: InventoryItem[];   // Items owned
+  equippedItems: string[];          // IDs of equipped items
+  activeItemEffects: ActiveItemEffect[]; // Temporary item effects
+}
+
+// Active event instance
+export interface ActiveEvent {
+  eventId: string;
+  startedAt: string;  // ISO date
+  expiresAt: string;  // ISO date
+  claimed: boolean;   // If rewards claimed
+}
+
+// Inventory item with quantity
+export interface InventoryItem {
+  itemId: string;
+  quantity: number;
+}
+
+// Active item effect (from consumables)
+export interface ActiveItemEffect {
+  itemId: string;
+  effect: Item['effects'];
+  expiresAt: string;  // ISO date
 }
 
 export interface XPCalculation {
@@ -286,6 +314,364 @@ export const DAILY_TASKS: DailyTask[] = [
     timeWindow: { start: 18, end: 23 }, // 6pm - 11pm
   },
 ];
+
+// ============================================
+// Random Events System
+// ============================================
+
+export type EventType = 'weather' | 'visitor' | 'discovery' | 'special';
+
+export interface RandomEvent {
+  id: string;
+  type: EventType;
+  nameZh: string;
+  descriptionZh: string;
+  emoji: string;
+  duration: number; // hours
+  effects: {
+    xpMultiplier?: number;
+    happinessMultiplier?: number;
+    bonusXP?: number;
+    bonusHappiness?: number;
+    itemDrop?: { itemId: string; chance: number };
+  };
+  petResponse: string; // What the pet says
+}
+
+// Weather events (last 24 hours)
+export const WEATHER_EVENTS: RandomEvent[] = [
+  {
+    id: 'sunny_day',
+    type: 'weather',
+    nameZh: '陽光普照',
+    descriptionZh: '今日天氣好好，寵物特別精神！',
+    emoji: '☀️',
+    duration: 24,
+    effects: { xpMultiplier: 1.2, bonusHappiness: 5 },
+    petResponse: '今日陽光好好呀！一齊練習啦！'
+  },
+  {
+    id: 'rainy_day',
+    type: 'weather',
+    nameZh: '下雨天',
+    descriptionZh: '落雨喇，留喺屋企練習啱晒！',
+    emoji: '🌧️',
+    duration: 24,
+    effects: { happinessMultiplier: 1.3 },
+    petResponse: '落雨喇～留喺屋企陪我好唔好？'
+  },
+  {
+    id: 'rainbow',
+    type: 'weather',
+    nameZh: '彩虹出現',
+    descriptionZh: '嘩！有彩虹呀！好幸運！',
+    emoji: '🌈',
+    duration: 12,
+    effects: { xpMultiplier: 1.5, bonusHappiness: 10, itemDrop: { itemId: 'lucky_clover', chance: 0.3 } },
+    petResponse: '彩虹呀！今日一定會好運！'
+  },
+  {
+    id: 'snowy_day',
+    type: 'weather',
+    nameZh: '落雪天',
+    descriptionZh: '好凍呀，寵物需要更多關愛！',
+    emoji: '❄️',
+    duration: 24,
+    effects: { happinessMultiplier: 1.2, itemDrop: { itemId: 'warm_scarf', chance: 0.2 } },
+    petResponse: '好凍呀～攬住我暖吓得唔得？'
+  },
+  {
+    id: 'starry_night',
+    type: 'weather',
+    nameZh: '星空之夜',
+    descriptionZh: '今晚星星好多好靚！',
+    emoji: '🌟',
+    duration: 12,
+    effects: { xpMultiplier: 1.3, itemDrop: { itemId: 'star_dust', chance: 0.25 } },
+    petResponse: '你睇！好多星星呀！'
+  },
+];
+
+// Visitor events (special interactions)
+export const VISITOR_EVENTS: RandomEvent[] = [
+  {
+    id: 'fairy_visit',
+    type: 'visitor',
+    nameZh: '小仙子來訪',
+    descriptionZh: '一隻小仙子嚟探你嘅寵物！',
+    emoji: '🧚',
+    duration: 6,
+    effects: { bonusXP: 20, itemDrop: { itemId: 'fairy_dust', chance: 0.5 } },
+    petResponse: '哇！小仙子嚟咗！佢好靚呀！'
+  },
+  {
+    id: 'dragon_friend',
+    type: 'visitor',
+    nameZh: '龍朋友探訪',
+    descriptionZh: '另一隻龍嚟同你嘅寵物玩！',
+    emoji: '🐲',
+    duration: 8,
+    effects: { bonusHappiness: 15, xpMultiplier: 1.2 },
+    petResponse: '我嘅朋友嚟咗！我哋一齊玩好開心！'
+  },
+  {
+    id: 'wise_owl',
+    type: 'visitor',
+    nameZh: '智慧貓頭鷹',
+    descriptionZh: '一隻聰明嘅貓頭鷹嚟教你嘅寵物！',
+    emoji: '🦉',
+    duration: 6,
+    effects: { xpMultiplier: 1.5, itemDrop: { itemId: 'wisdom_scroll', chance: 0.4 } },
+    petResponse: '貓頭鷹老師嚟咗！佢教咗我好多嘢！'
+  },
+  {
+    id: 'bunny_merchant',
+    type: 'visitor',
+    nameZh: '兔仔商人',
+    descriptionZh: '一隻兔仔商人帶嚟咗禮物！',
+    emoji: '🐰',
+    duration: 4,
+    effects: { itemDrop: { itemId: 'mystery_box', chance: 0.6 } },
+    petResponse: '兔仔商人好好人！佢送咗禮物俾我！'
+  },
+];
+
+// Discovery events (special finds)
+export const DISCOVERY_EVENTS: RandomEvent[] = [
+  {
+    id: 'treasure_found',
+    type: 'discovery',
+    nameZh: '發現寶藏',
+    descriptionZh: '寵物喺花園搵到咗寶藏！',
+    emoji: '💎',
+    duration: 1,
+    effects: { bonusXP: 30, itemDrop: { itemId: 'treasure_coin', chance: 0.8 } },
+    petResponse: '我搵到寶藏呀！好開心！'
+  },
+  {
+    id: 'magic_flower',
+    type: 'discovery',
+    nameZh: '魔法花開',
+    descriptionZh: '花園入面開咗一朵魔法花！',
+    emoji: '🌸',
+    duration: 6,
+    effects: { bonusHappiness: 20, itemDrop: { itemId: 'magic_petal', chance: 0.5 } },
+    petResponse: '好靚嘅花呀！聞落好香！'
+  },
+];
+
+// All events combined
+export const ALL_EVENTS: RandomEvent[] = [
+  ...WEATHER_EVENTS,
+  ...VISITOR_EVENTS,
+  ...DISCOVERY_EVENTS,
+];
+
+// ============================================
+// Items/Props System
+// ============================================
+
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'legendary';
+export type ItemCategory = 'consumable' | 'equipment' | 'decoration' | 'special';
+
+export interface Item {
+  id: string;
+  nameZh: string;
+  descriptionZh: string;
+  emoji: string;
+  category: ItemCategory;
+  rarity: ItemRarity;
+  effects: {
+    xpBoost?: number;           // Flat XP bonus when used
+    xpMultiplier?: number;      // XP multiplier (duration-based)
+    happinessBoost?: number;    // Flat happiness bonus
+    happinessMultiplier?: number;
+    durationMinutes?: number;   // For time-based effects
+    permanent?: boolean;        // For permanent boosts
+  };
+  shopPrice?: number;  // Stars to buy (undefined = not for sale)
+  dropChance?: number; // Base drop chance from practice (0-1)
+}
+
+export const ITEMS: Record<string, Item> = {
+  // Consumables - XP Boosters
+  xp_potion_small: {
+    id: 'xp_potion_small',
+    nameZh: '經驗藥水 (小)',
+    descriptionZh: '飲咗之後 10 分鐘內經驗值 x1.5',
+    emoji: '🧪',
+    category: 'consumable',
+    rarity: 'common',
+    effects: { xpMultiplier: 1.5, durationMinutes: 10 },
+    shopPrice: 50,
+    dropChance: 0.08,
+  },
+  xp_potion_medium: {
+    id: 'xp_potion_medium',
+    nameZh: '經驗藥水 (中)',
+    descriptionZh: '飲咗之後 20 分鐘內經驗值 x2',
+    emoji: '⚗️',
+    category: 'consumable',
+    rarity: 'uncommon',
+    effects: { xpMultiplier: 2, durationMinutes: 20 },
+    shopPrice: 120,
+    dropChance: 0.03,
+  },
+  xp_potion_large: {
+    id: 'xp_potion_large',
+    nameZh: '經驗藥水 (大)',
+    descriptionZh: '飲咗之後 30 分鐘內經驗值 x3！',
+    emoji: '🔮',
+    category: 'consumable',
+    rarity: 'rare',
+    effects: { xpMultiplier: 3, durationMinutes: 30 },
+    shopPrice: 300,
+    dropChance: 0.01,
+  },
+
+  // Consumables - Happiness Boosters
+  happiness_candy: {
+    id: 'happiness_candy',
+    nameZh: '開心糖',
+    descriptionZh: '即時增加 20 開心度',
+    emoji: '🍭',
+    category: 'consumable',
+    rarity: 'common',
+    effects: { happinessBoost: 20 },
+    shopPrice: 30,
+    dropChance: 0.1,
+  },
+  super_treat: {
+    id: 'super_treat',
+    nameZh: '超級零食',
+    descriptionZh: '即時增加 50 開心度！',
+    emoji: '🎂',
+    category: 'consumable',
+    rarity: 'uncommon',
+    effects: { happinessBoost: 50 },
+    shopPrice: 80,
+    dropChance: 0.04,
+  },
+
+  // Consumables - Instant XP
+  wisdom_scroll: {
+    id: 'wisdom_scroll',
+    nameZh: '智慧卷軸',
+    descriptionZh: '即時獲得 50 經驗值',
+    emoji: '📜',
+    category: 'consumable',
+    rarity: 'uncommon',
+    effects: { xpBoost: 50 },
+    dropChance: 0.02,
+  },
+  ancient_tome: {
+    id: 'ancient_tome',
+    nameZh: '古老典籍',
+    descriptionZh: '即時獲得 150 經驗值！',
+    emoji: '📚',
+    category: 'consumable',
+    rarity: 'rare',
+    effects: { xpBoost: 150 },
+    dropChance: 0.005,
+  },
+
+  // Special items from events
+  lucky_clover: {
+    id: 'lucky_clover',
+    nameZh: '幸運四葉草',
+    descriptionZh: '帶來好運！下次練習掉落率 x2',
+    emoji: '🍀',
+    category: 'special',
+    rarity: 'rare',
+    effects: { durationMinutes: 60 },
+  },
+  fairy_dust: {
+    id: 'fairy_dust',
+    nameZh: '仙子粉塵',
+    descriptionZh: '閃閃發光！經驗值 x2 持續 15 分鐘',
+    emoji: '✨',
+    category: 'special',
+    rarity: 'rare',
+    effects: { xpMultiplier: 2, durationMinutes: 15 },
+  },
+  star_dust: {
+    id: 'star_dust',
+    nameZh: '星塵',
+    descriptionZh: '星星嘅力量！即時獲得 30 經驗值',
+    emoji: '💫',
+    category: 'special',
+    rarity: 'uncommon',
+    effects: { xpBoost: 30 },
+  },
+  warm_scarf: {
+    id: 'warm_scarf',
+    nameZh: '溫暖圍巾',
+    descriptionZh: '好暖呀！開心度 +30',
+    emoji: '🧣',
+    category: 'special',
+    rarity: 'uncommon',
+    effects: { happinessBoost: 30 },
+  },
+  treasure_coin: {
+    id: 'treasure_coin',
+    nameZh: '寶藏金幣',
+    descriptionZh: '閃閃發亮嘅金幣！可以換 100 星星',
+    emoji: '🪙',
+    category: 'special',
+    rarity: 'rare',
+    effects: { xpBoost: 100 },
+  },
+  magic_petal: {
+    id: 'magic_petal',
+    nameZh: '魔法花瓣',
+    descriptionZh: '好香好靚！開心度 +40',
+    emoji: '🌺',
+    category: 'special',
+    rarity: 'uncommon',
+    effects: { happinessBoost: 40 },
+  },
+  mystery_box: {
+    id: 'mystery_box',
+    nameZh: '神秘盒子',
+    descriptionZh: '入面會有咩呢？打開嚟睇吓！',
+    emoji: '🎁',
+    category: 'special',
+    rarity: 'rare',
+    effects: {},  // Special handling - gives random item
+  },
+
+  // Equipment (permanent bonuses while equipped)
+  lucky_charm: {
+    id: 'lucky_charm',
+    nameZh: '幸運吊飾',
+    descriptionZh: '永久增加 5% 物品掉落率',
+    emoji: '🔮',
+    category: 'equipment',
+    rarity: 'legendary',
+    effects: { permanent: true },
+    shopPrice: 500,
+  },
+  study_hat: {
+    id: 'study_hat',
+    nameZh: '學習帽',
+    descriptionZh: '永久增加 10% 經驗值',
+    emoji: '🎓',
+    category: 'equipment',
+    rarity: 'legendary',
+    effects: { xpMultiplier: 1.1, permanent: true },
+    shopPrice: 800,
+  },
+};
+
+// Get items available in shop
+export function getShopItems(): Item[] {
+  return Object.values(ITEMS).filter(item => item.shopPrice !== undefined);
+}
+
+// Get items by rarity
+export function getItemsByRarity(rarity: ItemRarity): Item[] {
+  return Object.values(ITEMS).filter(item => item.rarity === rarity);
+}
 
 // Skills definitions
 export const PET_SKILLS: PetSkill[] = [
@@ -588,6 +974,12 @@ export function createDefaultPet(name: string = '小龍龍'): PetState {
     lastInteractionTime: '',
     dailyTasksCompleted: [],
     lastDailyTaskDate: '',
+    // Events & Items system defaults
+    activeEvent: null,
+    lastEventDate: '',
+    itemInventory: [],
+    equippedItems: [],
+    activeItemEffects: [],
   };
 }
 
@@ -720,4 +1112,343 @@ export function calculateFoodReward(starsEarned: number): FoodItem | null {
   }
 
   return null;
+}
+
+// ============================================
+// Events System Functions
+// ============================================
+
+/**
+ * Check if should trigger a new random event
+ * Events trigger every 2-3 days with some randomness
+ */
+export function shouldTriggerEvent(lastEventDate: string): boolean {
+  if (!lastEventDate) return true; // First time
+
+  const lastEvent = new Date(lastEventDate);
+  const now = new Date();
+  const daysSinceLastEvent = Math.floor((now.getTime() - lastEvent.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Base chance increases each day, guaranteed after 4 days
+  if (daysSinceLastEvent >= 4) return true;
+  if (daysSinceLastEvent < 2) return false;
+
+  // 30% chance on day 2, 60% on day 3
+  const chance = daysSinceLastEvent === 2 ? 0.3 : 0.6;
+  return Math.random() < chance;
+}
+
+/**
+ * Generate a random event
+ */
+export function generateRandomEvent(): RandomEvent {
+  // Weight towards weather events (more common)
+  const rand = Math.random();
+  let eventPool: RandomEvent[];
+
+  if (rand < 0.5) {
+    eventPool = WEATHER_EVENTS;
+  } else if (rand < 0.8) {
+    eventPool = VISITOR_EVENTS;
+  } else {
+    eventPool = DISCOVERY_EVENTS;
+  }
+
+  return eventPool[Math.floor(Math.random() * eventPool.length)];
+}
+
+/**
+ * Create an active event instance
+ */
+export function createActiveEvent(event: RandomEvent): ActiveEvent {
+  const now = new Date();
+  const expires = new Date(now.getTime() + event.duration * 60 * 60 * 1000);
+
+  return {
+    eventId: event.id,
+    startedAt: now.toISOString(),
+    expiresAt: expires.toISOString(),
+    claimed: false,
+  };
+}
+
+/**
+ * Check if an active event has expired
+ */
+export function isEventExpired(event: ActiveEvent | null): boolean {
+  if (!event) return true;
+  return new Date() > new Date(event.expiresAt);
+}
+
+/**
+ * Get event by ID
+ */
+export function getEventById(eventId: string): RandomEvent | undefined {
+  return ALL_EVENTS.find(e => e.id === eventId);
+}
+
+// ============================================
+// Items System Functions
+// ============================================
+
+/**
+ * Calculate item drop from practice
+ */
+export function calculateItemDrop(starsEarned: number, hasLuckyCharm: boolean): Item | null {
+  // Better stars = higher chance
+  const baseMultiplier = starsEarned === 3 ? 1.5 : starsEarned === 2 ? 1.2 : 1;
+  const luckyMultiplier = hasLuckyCharm ? 2 : 1;
+
+  // Try each item's drop chance
+  for (const item of Object.values(ITEMS)) {
+    if (item.dropChance) {
+      const adjustedChance = item.dropChance * baseMultiplier * luckyMultiplier;
+      if (Math.random() < adjustedChance) {
+        return item;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Add item to inventory
+ */
+export function addItemToInventory(inventory: InventoryItem[], itemId: string, quantity: number = 1): InventoryItem[] {
+  const existingIndex = inventory.findIndex(i => i.itemId === itemId);
+
+  if (existingIndex >= 0) {
+    const newInventory = [...inventory];
+    newInventory[existingIndex] = {
+      ...newInventory[existingIndex],
+      quantity: newInventory[existingIndex].quantity + quantity,
+    };
+    return newInventory;
+  }
+
+  return [...inventory, { itemId, quantity }];
+}
+
+/**
+ * Remove item from inventory
+ */
+export function removeItemFromInventory(inventory: InventoryItem[], itemId: string, quantity: number = 1): InventoryItem[] {
+  const existingIndex = inventory.findIndex(i => i.itemId === itemId);
+
+  if (existingIndex === -1) return inventory;
+
+  const newInventory = [...inventory];
+  const current = newInventory[existingIndex].quantity;
+
+  if (current <= quantity) {
+    newInventory.splice(existingIndex, 1);
+  } else {
+    newInventory[existingIndex] = {
+      ...newInventory[existingIndex],
+      quantity: current - quantity,
+    };
+  }
+
+  return newInventory;
+}
+
+/**
+ * Check if has item in inventory
+ */
+export function hasItem(inventory: InventoryItem[], itemId: string, quantity: number = 1): boolean {
+  const item = inventory.find(i => i.itemId === itemId);
+  return item ? item.quantity >= quantity : false;
+}
+
+/**
+ * Use a consumable item
+ */
+export function useItem(itemId: string, pet: PetState): { pet: PetState; success: boolean; message: string } {
+  const item = ITEMS[itemId];
+  if (!item) {
+    return { pet, success: false, message: '搵唔到呢件道具' };
+  }
+
+  if (!hasItem(pet.itemInventory, itemId)) {
+    return { pet, success: false, message: '你冇呢件道具' };
+  }
+
+  // Handle mystery box specially
+  if (itemId === 'mystery_box') {
+    const possibleItems = Object.values(ITEMS).filter(i =>
+      i.category !== 'equipment' && i.id !== 'mystery_box'
+    );
+    const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+
+    const newInventory = removeItemFromInventory(pet.itemInventory, itemId);
+    const finalInventory = addItemToInventory(newInventory, randomItem.id);
+
+    return {
+      pet: { ...pet, itemInventory: finalInventory },
+      success: true,
+      message: `打開咗神秘盒子，獲得 ${randomItem.emoji} ${randomItem.nameZh}！`,
+    };
+  }
+
+  // Apply item effects
+  let newPet = { ...pet };
+  let message = `使用咗 ${item.emoji} ${item.nameZh}！`;
+
+  // Instant XP boost
+  if (item.effects.xpBoost) {
+    newPet.xp += item.effects.xpBoost;
+    message += ` +${item.effects.xpBoost} 經驗值`;
+  }
+
+  // Instant happiness boost
+  if (item.effects.happinessBoost) {
+    newPet.happiness = Math.min(100, newPet.happiness + item.effects.happinessBoost);
+    message += ` +${item.effects.happinessBoost} 開心度`;
+  }
+
+  // Time-based effects
+  if (item.effects.durationMinutes && (item.effects.xpMultiplier || item.effects.happinessMultiplier)) {
+    const expiresAt = new Date(Date.now() + item.effects.durationMinutes * 60 * 1000).toISOString();
+    const newEffect: ActiveItemEffect = {
+      itemId,
+      effect: item.effects,
+      expiresAt,
+    };
+    newPet.activeItemEffects = [...(newPet.activeItemEffects || []), newEffect];
+    message += ` (${item.effects.durationMinutes}分鐘)`;
+  }
+
+  // Remove from inventory
+  newPet.itemInventory = removeItemFromInventory(pet.itemInventory, itemId);
+
+  return { pet: newPet, success: true, message };
+}
+
+/**
+ * Clean up expired item effects
+ */
+export function cleanupExpiredItemEffects(effects: ActiveItemEffect[]): ActiveItemEffect[] {
+  const now = new Date();
+  return effects.filter(effect => new Date(effect.expiresAt) > now);
+}
+
+/**
+ * Get current XP multiplier from active effects
+ */
+export function getActiveXPMultiplier(effects: ActiveItemEffect[], activeEvent: ActiveEvent | null): number {
+  let multiplier = 1;
+
+  // From item effects
+  for (const effect of effects) {
+    if (effect.effect.xpMultiplier && new Date(effect.expiresAt) > new Date()) {
+      multiplier *= effect.effect.xpMultiplier;
+    }
+  }
+
+  // From active event
+  if (activeEvent && !isEventExpired(activeEvent)) {
+    const event = getEventById(activeEvent.eventId);
+    if (event?.effects.xpMultiplier) {
+      multiplier *= event.effects.xpMultiplier;
+    }
+  }
+
+  return multiplier;
+}
+
+/**
+ * Get current happiness multiplier from active effects
+ */
+export function getActiveHappinessMultiplier(effects: ActiveItemEffect[], activeEvent: ActiveEvent | null): number {
+  let multiplier = 1;
+
+  // From item effects
+  for (const effect of effects) {
+    if (effect.effect.happinessMultiplier && new Date(effect.expiresAt) > new Date()) {
+      multiplier *= effect.effect.happinessMultiplier;
+    }
+  }
+
+  // From active event
+  if (activeEvent && !isEventExpired(activeEvent)) {
+    const event = getEventById(activeEvent.eventId);
+    if (event?.effects.happinessMultiplier) {
+      multiplier *= event.effects.happinessMultiplier;
+    }
+  }
+
+  return multiplier;
+}
+
+/**
+ * Equip an item
+ */
+export function equipItem(pet: PetState, itemId: string): { pet: PetState; success: boolean; message: string } {
+  const item = ITEMS[itemId];
+  if (!item || item.category !== 'equipment') {
+    return { pet, success: false, message: '呢件道具唔可以裝備' };
+  }
+
+  if (!hasItem(pet.itemInventory, itemId)) {
+    return { pet, success: false, message: '你冇呢件道具' };
+  }
+
+  if (pet.equippedItems.includes(itemId)) {
+    return { pet, success: false, message: '已經裝備咗' };
+  }
+
+  return {
+    pet: {
+      ...pet,
+      equippedItems: [...pet.equippedItems, itemId],
+    },
+    success: true,
+    message: `裝備咗 ${item.emoji} ${item.nameZh}！`,
+  };
+}
+
+/**
+ * Unequip an item
+ */
+export function unequipItem(pet: PetState, itemId: string): { pet: PetState; success: boolean; message: string } {
+  if (!pet.equippedItems.includes(itemId)) {
+    return { pet, success: false, message: '冇裝備呢件道具' };
+  }
+
+  const item = ITEMS[itemId];
+  return {
+    pet: {
+      ...pet,
+      equippedItems: pet.equippedItems.filter(id => id !== itemId),
+    },
+    success: true,
+    message: item ? `卸下咗 ${item.emoji} ${item.nameZh}` : '卸下咗道具',
+  };
+}
+
+/**
+ * Buy item from shop
+ */
+export function buyItem(itemId: string, currentStars: number, inventory: InventoryItem[]): {
+  success: boolean;
+  message: string;
+  newStars: number;
+  newInventory: InventoryItem[];
+} {
+  const item = ITEMS[itemId];
+  if (!item || !item.shopPrice) {
+    return { success: false, message: '呢件道具唔賣', newStars: currentStars, newInventory: inventory };
+  }
+
+  if (currentStars < item.shopPrice) {
+    return { success: false, message: `星星唔夠！需要 ${item.shopPrice} 粒星`, newStars: currentStars, newInventory: inventory };
+  }
+
+  return {
+    success: true,
+    message: `買咗 ${item.emoji} ${item.nameZh}！`,
+    newStars: currentStars - item.shopPrice,
+    newInventory: addItemToInventory(inventory, itemId),
+  };
 }

@@ -21,6 +21,31 @@ import {
   DAILY_TASKS,
   calculateFoodReward,
   getAvailableDailyTasks,
+  // Events & Items imports
+  RandomEvent,
+  ActiveEvent,
+  Item,
+  InventoryItem,
+  ActiveItemEffect,
+  ITEMS,
+  ALL_EVENTS,
+  shouldTriggerEvent,
+  generateRandomEvent,
+  createActiveEvent,
+  isEventExpired,
+  getEventById,
+  calculateItemDrop,
+  addItemToInventory,
+  removeItemFromInventory,
+  hasItem,
+  useItem,
+  cleanupExpiredItemEffects,
+  getActiveXPMultiplier,
+  getActiveHappinessMultiplier,
+  equipItem,
+  unequipItem,
+  buyItem,
+  getShopItems,
 } from './pet';
 
 export interface WordProgress {
@@ -170,6 +195,25 @@ function applyDailyUpdates(progress: UserProgress): UserProgress {
   // Reset daily tasks and pats if new day
   const resetDailyTasks = progress.pet.lastDailyTaskDate !== today;
 
+  // Cleanup expired item effects
+  const cleanedItemEffects = cleanupExpiredItemEffects(progress.pet.activeItemEffects || []);
+
+  // Check if active event expired
+  const currentEvent = progress.pet.activeEvent;
+  const eventExpired = isEventExpired(currentEvent);
+
+  // Check if should trigger new event (only if no active event or expired)
+  let newEvent = currentEvent;
+  let newLastEventDate = progress.pet.lastEventDate || '';
+
+  if (eventExpired && shouldTriggerEvent(progress.pet.lastEventDate || '')) {
+    const randomEvent = generateRandomEvent();
+    newEvent = createActiveEvent(randomEvent);
+    newLastEventDate = new Date().toISOString().split('T')[0];
+  } else if (eventExpired) {
+    newEvent = null;
+  }
+
   return {
     ...progress,
     isFirstSessionToday: isFirstSession,
@@ -188,6 +232,12 @@ function applyDailyUpdates(progress: UserProgress): UserProgress {
       // Ensure interaction fields exist
       foodInventory: progress.pet.foodInventory || [],
       lastInteractionTime: progress.pet.lastInteractionTime || '',
+      // Events & Items fields
+      activeEvent: newEvent,
+      lastEventDate: newLastEventDate,
+      itemInventory: progress.pet.itemInventory || [],
+      equippedItems: progress.pet.equippedItems || [],
+      activeItemEffects: cleanedItemEffects,
     },
   };
 }
@@ -765,7 +815,23 @@ export function getFoodInventorySummary(progress: UserProgress): { type: string;
 }
 
 // Re-export pet types and functions for convenience
-export type { PetState, PetStage, PetMood, FoodItem, DailyTask, InteractionResponse } from './pet';
+export type {
+  PetState,
+  PetStage,
+  PetMood,
+  FoodItem,
+  DailyTask,
+  InteractionResponse,
+  // Events & Items types
+  RandomEvent,
+  ActiveEvent,
+  Item,
+  InventoryItem,
+  ActiveItemEffect,
+  ItemRarity,
+  ItemCategory,
+  EventType,
+} from './pet';
 export {
   calculateXP,
   getPetMood,
@@ -790,4 +856,28 @@ export {
   MAX_PATS_PER_DAY,
   PAT_RESPONSES,
   PET_SPEECHES,
+  // Events exports
+  WEATHER_EVENTS,
+  VISITOR_EVENTS,
+  DISCOVERY_EVENTS,
+  ALL_EVENTS,
+  shouldTriggerEvent,
+  generateRandomEvent,
+  createActiveEvent,
+  isEventExpired,
+  getEventById,
+  // Items exports
+  ITEMS,
+  getShopItems,
+  calculateItemDrop,
+  addItemToInventory,
+  removeItemFromInventory,
+  hasItem,
+  useItem,
+  cleanupExpiredItemEffects,
+  getActiveXPMultiplier,
+  getActiveHappinessMultiplier,
+  equipItem,
+  unequipItem,
+  buyItem,
 } from './pet';
