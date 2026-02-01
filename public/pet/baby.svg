@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Baby Dragon - Stage 2 -->
+  <!-- Tiny cute dragon just hatched, big head small body -->
+
+  <!-- Shadow -->
+  <ellipse cx="50" cy="92" rx="20" ry="5" fill="#e0e0e0" opacity="0.5"/>
+
+  <!-- Tail (small, stubby) -->
+  <path d="M70 75 Q80 80 78 85 Q75 82 72 78" fill="#a78bfa"/>
+
+  <!-- Body (small round) -->
+  <ellipse cx="52" cy="72" rx="18" ry="15" fill="url(#babyBodyGradient)"/>
+
+  <!-- Belly -->
+  <ellipse cx="52" cy="75" rx="12" ry="10" fill="#fef3c7"/>
+
+  <!-- Head (big compared to body - kawaii style) -->
+  <circle cx="50" cy="45" r="25" fill="url(#babyHeadGradient)"/>
+
+  <!-- Ears/horns (tiny bumps) -->
+  <ellipse cx="32" cy="28" rx="5" ry="8" fill="#c4b5fd"/>
+  <ellipse cx="68" cy="28" rx="5" ry="8" fill="#c4b5fd"/>
+
+  <!-- Eyes (big sparkly) -->
+  <ellipse cx="40" cy="45" rx="8" ry="9" fill="white"/>
+  <ellipse cx="60" cy="45" rx="8" ry="9" fill="white"/>
+  <circle cx="42" cy="45" r="5" fill="#1e1b4b"/>
+  <circle cx="62" cy="45" r="5" fill="#1e1b4b"/>
+  <circle cx="44" cy="43" r="2" fill="white"/>
+  <circle cx="64" cy="43" r="2" fill="white"/>
+
+  <!-- Nose -->
+  <ellipse cx="50" cy="55" rx="3" ry="2" fill="#7c3aed"/>
+
+  <!-- Smile -->
+  <path d="M44 60 Q50 66 56 60" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Blush -->
+  <ellipse cx="32" cy="52" rx="5" ry="3" fill="#fda4af" opacity="0.6"/>
+  <ellipse cx="68" cy="52" rx="5" ry="3" fill="#fda4af" opacity="0.6"/>
+
+  <!-- Tiny wings (just nubs) -->
+  <ellipse cx="30" cy="65" rx="6" ry="8" fill="#ddd6fe"/>
+  <ellipse cx="74" cy="65" rx="6" ry="8" fill="#ddd6fe"/>
+
+  <!-- Little feet -->
+  <ellipse cx="42" cy="88" rx="6" ry="4" fill="#a78bfa"/>
+  <ellipse cx="62" cy="88" rx="6" ry="4" fill="#a78bfa"/>
+
+  <defs>
+    <linearGradient id="babyBodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="babyHeadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ddd6fe"/>
+      <stop offset="100%" stop-color="#c4b5fd"/>
+    </linearGradient>
+  </defs>
+</svg>

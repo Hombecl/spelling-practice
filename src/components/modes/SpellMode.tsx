@@ -14,12 +14,13 @@ interface SpellModeProps {
   word: Word;
   onComplete: (correct: boolean, attempts: number) => void;
   onSkip: () => void;
+  hintLetters?: number[]; // Indices of letters revealed by peek skill
 }
 
 const MAX_ERRORS = 3;
 const COOLDOWN_MS = 2000;
 
-export default function SpellMode({ word, onComplete, onSkip }: SpellModeProps) {
+export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }: SpellModeProps) {
   const [userInput, setUserInput] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [attempts, setAttempts] = useState(0);
@@ -153,7 +154,8 @@ export default function SpellMode({ word, onComplete, onSkip }: SpellModeProps) 
     setActiveSyllable(-1);
   };
 
-  const revealedLetters = word.word.split('').map(() => false);
+  // Mark letters revealed by peek skill
+  const revealedLetters = word.word.split('').map((_, i) => hintLetters.includes(i));
 
   return (
     <div

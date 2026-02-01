@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Child Dragon - Stage 3 -->
+  <!-- Growing dragon, more balanced proportions, small wings visible -->
+
+  <!-- Shadow -->
+  <ellipse cx="50" cy="94" rx="25" ry="5" fill="#e0e0e0" opacity="0.5"/>
+
+  <!-- Tail (longer, curved) -->
+  <path d="M72 70 Q85 75 88 82 Q90 88 85 90" stroke="#a78bfa" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <circle cx="85" cy="90" r="4" fill="#7c3aed"/>
+
+  <!-- Wings (small but visible) -->
+  <path d="M25 50 Q15 35 25 30 Q30 35 32 45 Q28 48 25 50" fill="#ddd6fe"/>
+  <path d="M75 50 Q85 35 75 30 Q70 35 68 45 Q72 48 75 50" fill="#ddd6fe"/>
+  <path d="M25 50 Q20 42 27 38" stroke="#c4b5fd" stroke-width="1" fill="none"/>
+  <path d="M75 50 Q80 42 73 38" stroke="#c4b5fd" stroke-width="1" fill="none"/>
+
+  <!-- Body -->
+  <ellipse cx="50" cy="65" rx="22" ry="20" fill="url(#childBodyGradient)"/>
+
+  <!-- Belly -->
+  <ellipse cx="50" cy="70" rx="14" ry="12" fill="#fef3c7"/>
+
+  <!-- Head -->
+  <ellipse cx="50" cy="35" rx="22" ry="20" fill="url(#childHeadGradient)"/>
+
+  <!-- Snout (small) -->
+  <ellipse cx="50" cy="48" rx="10" ry="6" fill="#c4b5fd"/>
+
+  <!-- Horns -->
+  <path d="M30 22 Q25 10 32 8" stroke="#7c3aed" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M70 22 Q75 10 68 8" stroke="#7c3aed" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Eyes -->
+  <ellipse cx="40" cy="32" rx="7" ry="8" fill="white"/>
+  <ellipse cx="60" cy="32" rx="7" ry="8" fill="white"/>
+  <circle cx="42" cy="33" r="4" fill="#1e1b4b"/>
+  <circle cx="62" cy="33" r="4" fill="#1e1b4b"/>
+  <circle cx="43" cy="31" r="1.5" fill="white"/>
+  <circle cx="63" cy="31" r="1.5" fill="white"/>
+
+  <!-- Nose dots -->
+  <circle cx="46" cy="48" r="2" fill="#7c3aed"/>
+  <circle cx="54" cy="48" r="2" fill="#7c3aed"/>
+
+  <!-- Smile -->
+  <path d="M44 53 Q50 58 56 53" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Blush -->
+  <ellipse cx="30" cy="38" rx="5" ry="3" fill="#fda4af" opacity="0.5"/>
+  <ellipse cx="70" cy="38" rx="5" ry="3" fill="#fda4af" opacity="0.5"/>
+
+  <!-- Arms (small) -->
+  <ellipse cx="30" cy="62" rx="5" ry="8" fill="#a78bfa"/>
+  <ellipse cx="70" cy="62" rx="5" ry="8" fill="#a78bfa"/>
+
+  <!-- Feet -->
+  <ellipse cx="40" cy="88" rx="8" ry="5" fill="#a78bfa"/>
+  <ellipse cx="60" cy="88" rx="8" ry="5" fill="#a78bfa"/>
+  <!-- Toes -->
+  <circle cx="35" cy="90" r="2" fill="#7c3aed"/>
+  <circle cx="40" cy="91" r="2" fill="#7c3aed"/>
+  <circle cx="60" cy="91" r="2" fill="#7c3aed"/>
+  <circle cx="65" cy="90" r="2" fill="#7c3aed"/>
+
+  <defs>
+    <linearGradient id="childBodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <linearGradient id="childHeadGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ddd6fe"/>
+      <stop offset="100%" stop-color="#a78bfa"/>
+    </linearGradient>
+  </defs>
+</svg>

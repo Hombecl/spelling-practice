@@ -1,4 +1,14 @@
 // Progress tracking with localStorage
+import {
+  PetState,
+  createDefaultPet,
+  getLevelFromXP,
+  getStageFromLevel,
+  getUnlockedSkills,
+  calculateHappinessDecay,
+  cleanupExpiredEffects,
+  PET_SKILLS,
+} from './pet';
 
 export interface WordProgress {
   word: string;
@@ -28,6 +38,14 @@ export interface UserProgress {
   streakDays: number;
   lastPlayedDate: string;
   totalWordsLearned: number;
+
+  // Pet system
+  pet: PetState;
+  totalXP: number;
+  xpEarnedToday: number;
+  lastXPDate: string;
+  isFirstSessionToday: boolean;
+  wordsCompletedToday: number;
 }
 
 const STORAGE_KEY = 'spelling-practice-progress';
@@ -46,6 +64,14 @@ const defaultProgress: UserProgress = {
   streakDays: 0,
   lastPlayedDate: '',
   totalWordsLearned: 0,
+
+  // Pet system defaults
+  pet: createDefaultPet(),
+  totalXP: 0,
+  xpEarnedToday: 0,
+  lastXPDate: '',
+  isFirstSessionToday: true,
+  wordsCompletedToday: 0,
 };
 
 export function getProgress(): UserProgress {
@@ -57,13 +83,87 @@ export function getProgress(): UserProgress {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored);
-      return { ...defaultProgress, ...parsed };
+      // Apply migration for existing users without pet data
+      const migrated = migrateProgress({ ...defaultProgress, ...parsed });
+      // Apply happiness decay and cleanup expired effects
+      return applyDailyUpdates(migrated);
     }
   } catch (e) {
     console.error('Error loading progress:', e);
   }
 
   return defaultProgress;
+}
+
+/**
+ * Migrate old progress data to include pet system
+ */
+function migrateProgress(progress: UserProgress): UserProgress {
+  // If pet already exists and has valid data, no migration needed
+  if (progress.pet && progress.pet.species && progress.pet.birthDate) {
+    return progress;
+  }
+
+  // Create default pet for existing users
+  const defaultPet = createDefaultPet();
+
+  // Reward existing users with XP based on their stars
+  const bonusXP = Math.floor((progress.totalStars || 0) * 2);
+  const initialLevel = getLevelFromXP(bonusXP);
+  const initialStage = getStageFromLevel(initialLevel);
+
+  // Build evolved stages based on level
+  const evolvedAt: Partial<Record<string, string>> = { egg: defaultPet.birthDate };
+  if (initialLevel >= 6) evolvedAt.baby = defaultPet.birthDate;
+  if (initialLevel >= 16) evolvedAt.child = defaultPet.birthDate;
+  if (initialLevel >= 31) evolvedAt.teen = defaultPet.birthDate;
+  if (initialLevel >= 51) evolvedAt.adult = defaultPet.birthDate;
+
+  return {
+    ...progress,
+    pet: {
+      ...defaultPet,
+      xp: bonusXP,
+      level: initialLevel,
+      stage: initialStage,
+      unlockedSkills: getUnlockedSkills(initialLevel).map(s => s.id),
+      evolvedAt: evolvedAt as PetState['evolvedAt'],
+    },
+    totalXP: bonusXP,
+    xpEarnedToday: 0,
+    lastXPDate: '',
+    isFirstSessionToday: true,
+    wordsCompletedToday: 0,
+  };
+}
+
+/**
+ * Apply daily updates: happiness decay, check first session, cleanup effects
+ */
+function applyDailyUpdates(progress: UserProgress): UserProgress {
+  const today = new Date().toISOString().split('T')[0];
+  const isFirstSession = progress.lastXPDate !== today;
+
+  // Calculate happiness decay if not practiced today
+  const decayedHappiness = calculateHappinessDecay(
+    progress.pet.lastFedDate,
+    progress.pet.happiness
+  );
+
+  // Cleanup expired active effects
+  const cleanedEffects = cleanupExpiredEffects(progress.pet.activeEffects);
+
+  return {
+    ...progress,
+    isFirstSessionToday: isFirstSession,
+    xpEarnedToday: isFirstSession ? 0 : progress.xpEarnedToday,
+    wordsCompletedToday: isFirstSession ? 0 : progress.wordsCompletedToday,
+    pet: {
+      ...progress.pet,
+      happiness: decayedHappiness,
+      activeEffects: cleanedEffects,
+    },
+  };
 }
 
 export function saveProgress(progress: UserProgress): void {
@@ -279,3 +379,151 @@ export const BADGES: Record<string, { name: string; description: string; emoji: 
     emoji: '👑',
   },
 };
+
+// ============================================
+// Pet System Functions
+// ============================================
+
+export interface EvolutionResult {
+  evolved: boolean;
+  oldStage: PetState['stage'];
+  newStage: PetState['stage'];
+}
+
+/**
+ * Add XP to the pet and check for evolution
+ */
+export function addXP(amount: number, progress: UserProgress): { progress: UserProgress; evolution: EvolutionResult | null } {
+  const newTotalXP = progress.totalXP + amount;
+  const newLevel = getLevelFromXP(newTotalXP);
+  const oldStage = progress.pet.stage;
+  const newStage = getStageFromLevel(newLevel);
+
+  let updatedPet = {
+    ...progress.pet,
+    xp: newTotalXP,
+    level: newLevel,
+    stage: newStage,
+  };
+
+  let evolution: EvolutionResult | null = null;
+
+  // Check for evolution
+  if (newStage !== oldStage) {
+    updatedPet = {
+      ...updatedPet,
+      evolvedAt: {
+        ...updatedPet.evolvedAt,
+        [newStage]: new Date().toISOString(),
+      },
+      // Unlock new skills
+      unlockedSkills: getUnlockedSkills(newLevel).map(s => s.id),
+    };
+    evolution = { evolved: true, oldStage, newStage };
+  } else {
+    // Check for new skill unlocks without evolution
+    const unlockedSkills = getUnlockedSkills(newLevel).map(s => s.id);
+    if (unlockedSkills.length > updatedPet.unlockedSkills.length) {
+      updatedPet = { ...updatedPet, unlockedSkills };
+    }
+  }
+
+  const today = new Date().toISOString().split('T')[0];
+
+  return {
+    progress: {
+      ...progress,
+      totalXP: newTotalXP,
+      xpEarnedToday: (progress.lastXPDate === today ? progress.xpEarnedToday : 0) + amount,
+      lastXPDate: today,
+      isFirstSessionToday: progress.lastXPDate !== today,
+      pet: updatedPet,
+    },
+    evolution,
+  };
+}
+
+/**
+ * Feed the pet (called when completing a word)
+ */
+export function feedPet(progress: UserProgress): UserProgress {
+  const today = new Date().toISOString().split('T')[0];
+  const isNewDay = progress.pet.lastFedDate !== today;
+
+  return {
+    ...progress,
+    pet: {
+      ...progress.pet,
+      lastFedDate: today,
+      // Increase happiness when practicing (cap at 100)
+      happiness: Math.min(100, progress.pet.happiness + (isNewDay ? 20 : 5)),
+      totalWordsSpelled: progress.pet.totalWordsSpelled + 1,
+    },
+    wordsCompletedToday: (progress.lastXPDate === today ? progress.wordsCompletedToday : 0) + 1,
+  };
+}
+
+/**
+ * Activate a pet skill
+ */
+export function activateSkill(skillId: string, progress: UserProgress): UserProgress {
+  const skill = PET_SKILLS.find(s => s.id === skillId);
+  if (!skill) return progress;
+
+  // Check if skill is unlocked
+  if (!progress.pet.unlockedSkills.includes(skillId)) return progress;
+
+  const now = new Date();
+  let expiresAt = now.toISOString();
+
+  // Calculate expiration based on skill type
+  if (skill.effect.durationMinutes) {
+    expiresAt = new Date(now.getTime() + skill.effect.durationMinutes * 60 * 1000).toISOString();
+  } else {
+    // For instant effects, set expiration to far future (will be cleaned up after use)
+    expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  const newEffect = {
+    skillId,
+    effect: skill.effect,
+    expiresAt,
+  };
+
+  return {
+    ...progress,
+    pet: {
+      ...progress.pet,
+      activeEffects: [...progress.pet.activeEffects, newEffect],
+    },
+  };
+}
+
+/**
+ * Rename the pet
+ */
+export function renamePet(newName: string, progress: UserProgress): UserProgress {
+  return {
+    ...progress,
+    pet: {
+      ...progress.pet,
+      name: newName.trim() || progress.pet.name,
+    },
+  };
+}
+
+// Re-export pet types and functions for convenience
+export type { PetState, PetStage, PetMood } from './pet';
+export {
+  calculateXP,
+  getPetMood,
+  getXPProgress,
+  PET_EMOJIS,
+  PET_STAGE_NAMES_ZH,
+  PET_ANIMATIONS,
+  MOOD_ANIMATIONS,
+  PET_SKILLS,
+  getXPToNextEvolution,
+  isSkillOnCooldown,
+  getSkillCooldownRemaining,
+} from './pet';

@@ -14,12 +14,13 @@ interface FillModeProps {
   word: Word;
   onComplete: (correct: boolean, attempts: number) => void;
   onSkip: () => void;
+  hintLetters?: number[]; // Indices of letters revealed by peek skill
 }
 
 const MAX_ERRORS = 3;
 const COOLDOWN_MS = 2000;
 
-export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
+export default function FillMode({ word, onComplete, onSkip, hintLetters = [] }: FillModeProps) {
   const [userInput, setUserInput] = useState<string[]>([]);
   const [revealedIndices, setRevealedIndices] = useState<number[]>([]);
   const [availableLetters, setAvailableLetters] = useState<string[]>([]);
@@ -166,10 +167,14 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
     }
   };
 
-  // Build display with revealed and user input
+  // Build display with revealed, user input, and hint letters
   const displayLetters = word.word.split('').map((letter, index) => {
     if (revealedIndices.includes(index)) {
       return { letter, status: 'revealed' as const };
+    }
+    // Check if this letter was revealed by peek skill
+    if (hintLetters.includes(index)) {
+      return { letter, status: 'hint' as const };
     }
     if (userInput[index]) {
       return { letter: userInput[index], status: 'filled' as const };
@@ -232,6 +237,8 @@ export default function FillMode({ word, onComplete, onSkip }: FillModeProps) {
               ${
                 item.status === 'revealed'
                   ? 'bg-blue-100 border-blue-300 text-blue-700'
+                  : item.status === 'hint'
+                  ? 'bg-purple-100 border-purple-400 text-purple-700 ring-2 ring-purple-300'
                   : item.status === 'filled'
                   ? 'bg-green-100 border-green-400 text-green-700'
                   : item.status === 'current'

@@ -59,8 +59,14 @@ export default function WordDisplay({
             }
           }
         } else {
-          // In spell mode, show user input
-          if (hasUserInput) {
+          // In spell mode, show user input or revealed letters (from peek skill)
+          if (isRevealed) {
+            // Letter revealed by peek skill
+            displayLetter = letter.toUpperCase();
+            bgColor = 'bg-purple-100';
+            borderColor = 'border-purple-400';
+            textColor = 'text-purple-700';
+          } else if (hasUserInput) {
             displayLetter = userInput[index].toUpperCase();
             if (userInput[index].toLowerCase() === letter.toLowerCase()) {
               bgColor = 'bg-green-100';
