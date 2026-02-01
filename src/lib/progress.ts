@@ -8,6 +8,19 @@ import {
   calculateHappinessDecay,
   cleanupExpiredEffects,
   PET_SKILLS,
+  FoodItem,
+  DailyTask,
+  InteractionResponse,
+  getPatResponse,
+  canPatPet,
+  getRemainingPats,
+  HAPPINESS_PER_PAT,
+  XP_PER_PAT,
+  MAX_PATS_PER_DAY,
+  FOOD_TYPES,
+  DAILY_TASKS,
+  calculateFoodReward,
+  getAvailableDailyTasks,
 } from './pet';
 
 export interface WordProgress {
@@ -138,11 +151,12 @@ function migrateProgress(progress: UserProgress): UserProgress {
 }
 
 /**
- * Apply daily updates: happiness decay, check first session, cleanup effects
+ * Apply daily updates: happiness decay, check first session, cleanup effects, reset daily tasks
  */
 function applyDailyUpdates(progress: UserProgress): UserProgress {
   const today = new Date().toISOString().split('T')[0];
   const isFirstSession = progress.lastXPDate !== today;
+  const isNewDay = progress.pet.lastPatDate !== today;
 
   // Calculate happiness decay if not practiced today
   const decayedHappiness = calculateHappinessDecay(
@@ -153,6 +167,9 @@ function applyDailyUpdates(progress: UserProgress): UserProgress {
   // Cleanup expired active effects
   const cleanedEffects = cleanupExpiredEffects(progress.pet.activeEffects);
 
+  // Reset daily tasks and pats if new day
+  const resetDailyTasks = progress.pet.lastDailyTaskDate !== today;
+
   return {
     ...progress,
     isFirstSessionToday: isFirstSession,
@@ -162,6 +179,15 @@ function applyDailyUpdates(progress: UserProgress): UserProgress {
       ...progress.pet,
       happiness: decayedHappiness,
       activeEffects: cleanedEffects,
+      // Reset pats for new day
+      patsToday: isNewDay ? 0 : (progress.pet.patsToday || 0),
+      lastPatDate: progress.pet.lastPatDate || '',
+      // Reset daily tasks for new day
+      dailyTasksCompleted: resetDailyTasks ? [] : (progress.pet.dailyTasksCompleted || []),
+      lastDailyTaskDate: progress.pet.lastDailyTaskDate || '',
+      // Ensure interaction fields exist
+      foodInventory: progress.pet.foodInventory || [],
+      lastInteractionTime: progress.pet.lastInteractionTime || '',
     },
   };
 }
@@ -512,8 +538,234 @@ export function renamePet(newName: string, progress: UserProgress): UserProgress
   };
 }
 
+// ============================================
+// Pet Interaction Functions
+// ============================================
+
+export interface PatResult {
+  success: boolean;
+  response: InteractionResponse;
+  happinessGained: number;
+  xpGained: number;
+  remainingPats: number;
+}
+
+/**
+ * Pat the pet - increases happiness and gives small XP
+ */
+export function patPet(progress: UserProgress): { progress: UserProgress; result: PatResult } {
+  const today = new Date().toISOString().split('T')[0];
+
+  // Check if can pat
+  if (!canPatPet(progress.pet)) {
+    return {
+      progress,
+      result: {
+        success: false,
+        response: { animation: '', message: '今日已經摸夠喇！明天再嚟～', emoji: '😅' },
+        happinessGained: 0,
+        xpGained: 0,
+        remainingPats: 0,
+      },
+    };
+  }
+
+  // Reset count if new day
+  const patsToday = progress.pet.lastPatDate === today ? progress.pet.patsToday + 1 : 1;
+  const response = getPatResponse(progress.pet.stage);
+
+  const newProgress: UserProgress = {
+    ...progress,
+    totalXP: progress.totalXP + XP_PER_PAT,
+    pet: {
+      ...progress.pet,
+      happiness: Math.min(100, progress.pet.happiness + HAPPINESS_PER_PAT),
+      patsToday,
+      lastPatDate: today,
+      lastInteractionTime: new Date().toISOString(),
+    },
+  };
+
+  return {
+    progress: newProgress,
+    result: {
+      success: true,
+      response,
+      happinessGained: HAPPINESS_PER_PAT,
+      xpGained: XP_PER_PAT,
+      remainingPats: MAX_PATS_PER_DAY - patsToday,
+    },
+  };
+}
+
+export interface FeedResult {
+  success: boolean;
+  message: string;
+  happinessGained: number;
+  xpGained: number;
+}
+
+/**
+ * Feed the pet with food from inventory
+ */
+export function feedPetWithFood(
+  foodType: 'dragon_fruit' | 'magic_berry' | 'star_candy',
+  progress: UserProgress
+): { progress: UserProgress; result: FeedResult } {
+  // Check if has food
+  const foodIndex = progress.pet.foodInventory.findIndex(f => f.type === foodType && f.quantity > 0);
+
+  if (foodIndex === -1) {
+    return {
+      progress,
+      result: {
+        success: false,
+        message: '冇呢種食物喇！',
+        happinessGained: 0,
+        xpGained: 0,
+      },
+    };
+  }
+
+  const foodInfo = FOOD_TYPES[foodType];
+  const newInventory = [...progress.pet.foodInventory];
+
+  // Decrease quantity or remove
+  if (newInventory[foodIndex].quantity <= 1) {
+    newInventory.splice(foodIndex, 1);
+  } else {
+    newInventory[foodIndex] = {
+      ...newInventory[foodIndex],
+      quantity: newInventory[foodIndex].quantity - 1,
+    };
+  }
+
+  const newProgress: UserProgress = {
+    ...progress,
+    totalXP: progress.totalXP + foodInfo.xpBoost,
+    pet: {
+      ...progress.pet,
+      happiness: Math.min(100, progress.pet.happiness + foodInfo.happinessBoost),
+      foodInventory: newInventory,
+      lastInteractionTime: new Date().toISOString(),
+    },
+  };
+
+  return {
+    progress: newProgress,
+    result: {
+      success: true,
+      message: `${progress.pet.name} 好鍾意食 ${foodInfo.nameZh}！`,
+      happinessGained: foodInfo.happinessBoost,
+      xpGained: foodInfo.xpBoost,
+    },
+  };
+}
+
+/**
+ * Add food to inventory (called after practice)
+ */
+export function addFoodReward(
+  food: FoodItem,
+  progress: UserProgress
+): UserProgress {
+  const existingIndex = progress.pet.foodInventory.findIndex(f => f.type === food.type);
+
+  let newInventory: FoodItem[];
+  if (existingIndex >= 0) {
+    newInventory = [...progress.pet.foodInventory];
+    newInventory[existingIndex] = {
+      ...newInventory[existingIndex],
+      quantity: newInventory[existingIndex].quantity + food.quantity,
+    };
+  } else {
+    newInventory = [...progress.pet.foodInventory, food];
+  }
+
+  return {
+    ...progress,
+    pet: {
+      ...progress.pet,
+      foodInventory: newInventory,
+    },
+  };
+}
+
+export interface DailyTaskResult {
+  success: boolean;
+  task: DailyTask;
+  xpGained: number;
+  happinessGained: number;
+}
+
+/**
+ * Complete a daily task
+ */
+export function completeDailyTask(
+  taskId: string,
+  progress: UserProgress
+): { progress: UserProgress; result: DailyTaskResult | null } {
+  const today = new Date().toISOString().split('T')[0];
+  const task = DAILY_TASKS.find(t => t.id === taskId);
+
+  if (!task) {
+    return { progress, result: null };
+  }
+
+  // Check if already completed
+  const completedTasks = progress.pet.lastDailyTaskDate === today
+    ? progress.pet.dailyTasksCompleted
+    : [];
+
+  if (completedTasks.includes(taskId)) {
+    return { progress, result: null };
+  }
+
+  // Check time window
+  if (task.timeWindow) {
+    const currentHour = new Date().getHours();
+    if (currentHour < task.timeWindow.start || currentHour > task.timeWindow.end) {
+      return { progress, result: null };
+    }
+  }
+
+  const newProgress: UserProgress = {
+    ...progress,
+    totalXP: progress.totalXP + task.xpReward,
+    pet: {
+      ...progress.pet,
+      happiness: Math.min(100, progress.pet.happiness + task.happinessReward),
+      dailyTasksCompleted: [...completedTasks, taskId],
+      lastDailyTaskDate: today,
+      lastInteractionTime: new Date().toISOString(),
+    },
+  };
+
+  return {
+    progress: newProgress,
+    result: {
+      success: true,
+      task,
+      xpGained: task.xpReward,
+      happinessGained: task.happinessReward,
+    },
+  };
+}
+
+/**
+ * Get food inventory summary
+ */
+export function getFoodInventorySummary(progress: UserProgress): { type: string; nameZh: string; emoji: string; quantity: number }[] {
+  return progress.pet.foodInventory.map(food => ({
+    type: food.type,
+    nameZh: FOOD_TYPES[food.type].nameZh,
+    emoji: FOOD_TYPES[food.type].emoji,
+    quantity: food.quantity,
+  }));
+}
+
 // Re-export pet types and functions for convenience
-export type { PetState, PetStage, PetMood } from './pet';
+export type { PetState, PetStage, PetMood, FoodItem, DailyTask, InteractionResponse } from './pet';
 export {
   calculateXP,
   getPetMood,
@@ -526,4 +778,16 @@ export {
   getXPToNextEvolution,
   isSkillOnCooldown,
   getSkillCooldownRemaining,
+  // Interaction exports
+  getPatResponse,
+  canPatPet,
+  getRemainingPats,
+  getRandomSpeech,
+  getAvailableDailyTasks,
+  calculateFoodReward,
+  FOOD_TYPES,
+  DAILY_TASKS,
+  MAX_PATS_PER_DAY,
+  PAT_RESPONSES,
+  PET_SPEECHES,
 } from './pet';

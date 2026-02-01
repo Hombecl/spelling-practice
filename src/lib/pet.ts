@@ -41,6 +41,31 @@ export interface ActiveEffect {
   usesRemaining?: number; // For per-use effects
 }
 
+// Food item from practice rewards
+export interface FoodItem {
+  id: string;
+  type: 'dragon_fruit' | 'magic_berry' | 'star_candy';
+  quantity: number;
+}
+
+// Daily task definition
+export interface DailyTask {
+  id: string;
+  nameZh: string;
+  descriptionZh: string;
+  emoji: string;
+  xpReward: number;
+  happinessReward: number;
+  timeWindow?: { start: number; end: number }; // Hour of day (0-23)
+}
+
+// Pet interaction response
+export interface InteractionResponse {
+  animation: string;
+  message: string;
+  emoji: string;
+}
+
 export interface PetState {
   // Core identity
   name: string;
@@ -63,6 +88,14 @@ export interface PetState {
   evolvedAt: Partial<Record<PetStage, string>>;
   totalWordsSpelled: number;
   birthDate: string;
+
+  // Interaction system
+  patsToday: number;           // How many times patted today
+  lastPatDate: string;         // Date of last pat
+  foodInventory: FoodItem[];   // Food items from practice
+  lastInteractionTime: string; // For cooldowns
+  dailyTasksCompleted: string[]; // IDs of completed daily tasks
+  lastDailyTaskDate: string;   // For resetting daily tasks
 }
 
 export interface XPCalculation {
@@ -122,6 +155,137 @@ export const MOOD_ANIMATIONS: Record<PetMood, string> = {
   hungry: 'animate-droop',
   sleepy: 'animate-zzz'
 };
+
+// ============================================
+// Interaction System Constants
+// ============================================
+
+// Maximum pats per day
+export const MAX_PATS_PER_DAY = 5;
+
+// Happiness gained per pat
+export const HAPPINESS_PER_PAT = 3;
+
+// XP gained per pat (small amount)
+export const XP_PER_PAT = 1;
+
+// Food types and their effects
+export const FOOD_TYPES = {
+  dragon_fruit: {
+    nameZh: '龍果',
+    emoji: '🍇',
+    happinessBoost: 10,
+    xpBoost: 5,
+    description: '寵物最愛嘅水果！'
+  },
+  magic_berry: {
+    nameZh: '魔法莓',
+    emoji: '🫐',
+    happinessBoost: 15,
+    xpBoost: 10,
+    description: '閃閃發光嘅神奇莓果'
+  },
+  star_candy: {
+    nameZh: '星星糖',
+    emoji: '🍬',
+    happinessBoost: 20,
+    xpBoost: 15,
+    description: '用星星造成嘅糖果'
+  }
+} as const;
+
+// Pat responses by stage
+export const PAT_RESPONSES: Record<PetStage, InteractionResponse[]> = {
+  egg: [
+    { animation: 'animate-wobble', message: '蛋蛋搖咗搖！', emoji: '✨' },
+    { animation: 'animate-shake', message: '入面好似有聲...', emoji: '👂' },
+    { animation: 'animate-pulse', message: '蛋蛋暖暖哋！', emoji: '💕' },
+  ],
+  baby: [
+    { animation: 'animate-bounce-gentle', message: '嘰嘰！好開心！', emoji: '💖' },
+    { animation: 'animate-wobble', message: '搖搖擺擺～', emoji: '🎵' },
+    { animation: 'animate-pulse', message: '舒服到瞇埋眼！', emoji: '😊' },
+  ],
+  child: [
+    { animation: 'animate-bounce-gentle', message: '摸多啲！摸多啲！', emoji: '🥰' },
+    { animation: 'animate-sway', message: '尾巴搖晒！', emoji: '💫' },
+    { animation: 'animate-float', message: '開心到想飛！', emoji: '✨' },
+  ],
+  teen: [
+    { animation: 'animate-float', message: '唔錯喎～', emoji: '😎' },
+    { animation: 'animate-pulse', message: '...其實幾舒服', emoji: '😌' },
+    { animation: 'animate-sway', message: '好啦好啦～', emoji: '💕' },
+  ],
+  adult: [
+    { animation: 'animate-glow-float', message: '謝謝你嘅關心！', emoji: '💖' },
+    { animation: 'animate-float', message: '呼～噴咗少少煙', emoji: '💨' },
+    { animation: 'animate-pulse', message: '你係最好嘅朋友！', emoji: '🌟' },
+  ],
+};
+
+// Random pet speech bubbles by mood
+export const PET_SPEECHES: Record<PetMood, string[]> = {
+  happy: [
+    '今日一齊練習啦！',
+    '我哋係最好嘅拍檔！',
+    '你好叻呀！',
+    '繼續加油！💪',
+    '我好開心呀！',
+    '多謝你陪我！',
+  ],
+  content: [
+    '今日天氣真好～',
+    '想學新嘢！',
+    '一齊練習吖？',
+    '我等緊你～',
+    '嗯～普通啦',
+  ],
+  hungry: [
+    '好耐冇練習喇...',
+    '有啲悶悶哋...',
+    '你喺邊呀？',
+    '想你陪我練習...',
+    '我等緊你返嚟...',
+  ],
+  sleepy: [
+    'zzZ... zzZ...',
+    '好攰... 要瞓覺...',
+    '(打喊露)',
+    '冇精神...',
+    '要休息吓...',
+  ],
+};
+
+// Daily tasks
+export const DAILY_TASKS: DailyTask[] = [
+  {
+    id: 'morning_greeting',
+    nameZh: '早晨打招呼',
+    descriptionZh: '朝早同寵物講早晨',
+    emoji: '🌅',
+    xpReward: 5,
+    happinessReward: 10,
+    timeWindow: { start: 6, end: 11 }, // 6am - 11am
+  },
+  {
+    id: 'afternoon_play',
+    nameZh: '下午玩耍',
+    descriptionZh: '下午同寵物玩吓',
+    emoji: '🎮',
+    xpReward: 5,
+    happinessReward: 10,
+    timeWindow: { start: 12, end: 17 }, // 12pm - 5pm
+  },
+  {
+    id: 'goodnight',
+    nameZh: '晚安道別',
+    descriptionZh: '臨瞓前同寵物講晚安',
+    emoji: '🌙',
+    xpReward: 5,
+    happinessReward: 10,
+    timeWindow: { start: 18, end: 23 }, // 6pm - 11pm
+  },
+];
 
 // Skills definitions
 export const PET_SKILLS: PetSkill[] = [
@@ -416,7 +580,14 @@ export function createDefaultPet(name: string = '小龍龍'): PetState {
     activeEffects: [],
     evolvedAt: { egg: now },
     totalWordsSpelled: 0,
-    birthDate: now
+    birthDate: now,
+    // Interaction system defaults
+    patsToday: 0,
+    lastPatDate: '',
+    foodInventory: [],
+    lastInteractionTime: '',
+    dailyTasksCompleted: [],
+    lastDailyTaskDate: '',
   };
 }
 
@@ -449,4 +620,104 @@ export function getXPToNextEvolution(xp: number, stage: PetStage): { needed: num
     needed: threshold,
     current: xp
   };
+}
+
+// ============================================
+// Interaction System Functions
+// ============================================
+
+/**
+ * Get a random pat response for the pet's current stage
+ */
+export function getPatResponse(stage: PetStage): InteractionResponse {
+  const responses = PAT_RESPONSES[stage];
+  return responses[Math.floor(Math.random() * responses.length)];
+}
+
+/**
+ * Check if pet can be patted (haven't reached daily limit)
+ */
+export function canPatPet(pet: PetState): boolean {
+  const today = new Date().toISOString().split('T')[0];
+  if (pet.lastPatDate !== today) {
+    return true; // New day, reset count
+  }
+  return pet.patsToday < MAX_PATS_PER_DAY;
+}
+
+/**
+ * Get remaining pats for today
+ */
+export function getRemainingPats(pet: PetState): number {
+  const today = new Date().toISOString().split('T')[0];
+  if (pet.lastPatDate !== today) {
+    return MAX_PATS_PER_DAY;
+  }
+  return Math.max(0, MAX_PATS_PER_DAY - pet.patsToday);
+}
+
+/**
+ * Get random speech bubble based on mood
+ */
+export function getRandomSpeech(mood: PetMood): string {
+  const speeches = PET_SPEECHES[mood];
+  return speeches[Math.floor(Math.random() * speeches.length)];
+}
+
+/**
+ * Check if a daily task is available now
+ */
+export function isDailyTaskAvailable(task: DailyTask, completedTasks: string[], lastTaskDate: string): boolean {
+  const today = new Date().toISOString().split('T')[0];
+  const currentHour = new Date().getHours();
+
+  // Reset tasks for new day
+  if (lastTaskDate !== today) {
+    // Check time window
+    if (task.timeWindow) {
+      return currentHour >= task.timeWindow.start && currentHour <= task.timeWindow.end;
+    }
+    return true;
+  }
+
+  // Already completed today
+  if (completedTasks.includes(task.id)) {
+    return false;
+  }
+
+  // Check time window
+  if (task.timeWindow) {
+    return currentHour >= task.timeWindow.start && currentHour <= task.timeWindow.end;
+  }
+
+  return true;
+}
+
+/**
+ * Get all available daily tasks
+ */
+export function getAvailableDailyTasks(pet: PetState): DailyTask[] {
+  return DAILY_TASKS.filter(task =>
+    isDailyTaskAvailable(task, pet.dailyTasksCompleted, pet.lastDailyTaskDate)
+  );
+}
+
+/**
+ * Award food based on practice performance
+ */
+export function calculateFoodReward(starsEarned: number): FoodItem | null {
+  // 3 stars = chance for star candy
+  // 2 stars = chance for magic berry
+  // 1 star = chance for dragon fruit
+  const random = Math.random();
+
+  if (starsEarned >= 3 && random < 0.3) {
+    return { id: Date.now().toString(), type: 'star_candy', quantity: 1 };
+  } else if (starsEarned >= 2 && random < 0.4) {
+    return { id: Date.now().toString(), type: 'magic_berry', quantity: 1 };
+  } else if (random < 0.5) {
+    return { id: Date.now().toString(), type: 'dragon_fruit', quantity: 1 };
+  }
+
+  return null;
 }
