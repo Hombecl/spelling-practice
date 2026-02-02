@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="#3b82f6"/>
+
+  <!-- Inner glow -->
+  <circle cx="256" cy="256" r="220" fill="#60a5fa"/>
+
+  <!-- Slime body (green) -->
+  <ellipse cx="256" cy="300" rx="140" ry="120" fill="#22c55e"/>
+
+  <!-- Slime highlight -->
+  <ellipse cx="220" cy="260" rx="40" ry="30" fill="#4ade80" opacity="0.7"/>
+
+  <!-- Left eye white -->
+  <ellipse cx="210" cy="280" rx="35" ry="40" fill="white"/>
+  <!-- Left pupil -->
+  <circle cx="218" cy="285" r="18" fill="#1e293b"/>
+  <!-- Left eye shine -->
+  <circle cx="210" cy="275" r="8" fill="white"/>
+
+  <!-- Right eye white -->
+  <ellipse cx="302" cy="280" rx="35" ry="40" fill="white"/>
+  <!-- Right pupil -->
+  <circle cx="310" cy="285" r="18" fill="#1e293b"/>
+  <!-- Right eye shine -->
+  <circle cx="302" cy="275" r="8" fill="white"/>
+
+  <!-- Smile -->
+  <path d="M 220 340 Q 256 380 292 340" stroke="#1e293b" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+  <!-- Cheek blush -->
+  <ellipse cx="170" cy="320" rx="20" ry="12" fill="#fda4af" opacity="0.6"/>
+  <ellipse cx="342" cy="320" rx="20" ry="12" fill="#fda4af" opacity="0.6"/>
+
+  <!-- ABC text -->
+  <text x="256" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="white">ABC</text>
+</svg>

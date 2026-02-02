@@ -98,6 +98,12 @@ import SpellingTestChallenge from '@/components/adventure/SpellingTestChallenge'
 import PetDisplay from '@/components/pet/PetDisplay';
 import PetSelection from '@/components/pet/PetSelection';
 import { PetSpecies } from '@/lib/pet';
+import { registerServiceWorker } from '@/lib/registerSW';
+
+// Register service worker for PWA
+if (typeof window !== 'undefined') {
+  registerServiceWorker();
+}
 
 type PetScreen = 'main' | 'shop' | 'badges';
 type AdventureScreen = 'map' | 'stage' | 'boss' | 'spelling-test';
