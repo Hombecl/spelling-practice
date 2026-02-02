@@ -1,48 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
-  <!-- Cute Baby Slime - Stage 2 -->
-  <!-- Round bouncy slime with huge kawaii eyes -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- Tamagotchi-style Baby Slime - Dragon Quest inspired -->
+  <!-- Classic teardrop shape with big eyes -->
 
   <!-- Shadow -->
-  <ellipse cx="32" cy="58" rx="18" ry="5" fill="#a78bfa" opacity="0.4"/>
+  <rect x="9" y="28" width="14" height="2" fill="#9ca3af"/>
 
-  <!-- Main slime body - big round blob -->
-  <ellipse cx="32" cy="38" rx="22" ry="20" fill="#c4b5fd"/>
+  <!-- Body outline (black) -->
+  <rect x="14" y="4" width="4" height="1" fill="#000"/>
+  <rect x="12" y="5" width="2" height="1" fill="#000"/>
+  <rect x="18" y="5" width="2" height="1" fill="#000"/>
+  <rect x="11" y="6" width="1" height="1" fill="#000"/>
+  <rect x="20" y="6" width="1" height="1" fill="#000"/>
+  <rect x="10" y="7" width="1" height="2" fill="#000"/>
+  <rect x="21" y="7" width="1" height="2" fill="#000"/>
+  <rect x="9" y="9" width="1" height="3" fill="#000"/>
+  <rect x="22" y="9" width="1" height="3" fill="#000"/>
+  <rect x="8" y="12" width="1" height="6" fill="#000"/>
+  <rect x="23" y="12" width="1" height="6" fill="#000"/>
+  <rect x="7" y="18" width="1" height="6" fill="#000"/>
+  <rect x="24" y="18" width="1" height="6" fill="#000"/>
+  <rect x="8" y="24" width="1" height="2" fill="#000"/>
+  <rect x="23" y="24" width="1" height="2" fill="#000"/>
+  <rect x="9" y="26" width="2" height="1" fill="#000"/>
+  <rect x="21" y="26" width="2" height="1" fill="#000"/>
+  <rect x="11" y="27" width="10" height="1" fill="#000"/>
 
-  <!-- Inner highlight layer -->
-  <ellipse cx="32" cy="36" rx="18" ry="16" fill="#ddd6fe"/>
+  <!-- Body fill (light blue like DQ slime) -->
+  <rect x="14" y="5" width="4" height="1" fill="#7dd3fc"/>
+  <rect x="12" y="6" width="8" height="1" fill="#7dd3fc"/>
+  <rect x="11" y="7" width="10" height="2" fill="#7dd3fc"/>
+  <rect x="10" y="9" width="12" height="3" fill="#7dd3fc"/>
+  <rect x="9" y="12" width="14" height="6" fill="#7dd3fc"/>
+  <rect x="8" y="18" width="16" height="6" fill="#7dd3fc"/>
+  <rect x="9" y="24" width="14" height="2" fill="#7dd3fc"/>
+  <rect x="11" y="26" width="10" height="1" fill="#7dd3fc"/>
 
-  <!-- Big shine highlight -->
-  <ellipse cx="24" cy="28" rx="8" ry="10" fill="white" opacity="0.5"/>
+  <!-- Highlight (white) -->
+  <rect x="12" y="7" width="3" height="2" fill="#fff"/>
+  <rect x="11" y="9" width="2" height="1" fill="#fff"/>
 
-  <!-- Tiny antenna/bump on top -->
-  <ellipse cx="32" cy="16" rx="4" ry="6" fill="#c4b5fd"/>
-  <circle cx="32" cy="12" r="3" fill="#ddd6fe"/>
+  <!-- Eyes (classic DQ style - big and round) -->
+  <rect x="11" y="14" width="4" height="4" fill="#fff"/>
+  <rect x="17" y="14" width="4" height="4" fill="#fff"/>
+  <!-- Pupils -->
+  <rect x="13" y="15" width="2" height="2" fill="#000"/>
+  <rect x="19" y="15" width="2" height="2" fill="#000"/>
+  <!-- Eye shine -->
+  <rect x="13" y="15" width="1" height="1" fill="#fff"/>
+  <rect x="19" y="15" width="1" height="1" fill="#fff"/>
 
-  <!-- HUGE kawaii eyes -->
-  <g id="left-eye">
-    <ellipse cx="24" cy="36" rx="8" ry="9" fill="white"/>
-    <ellipse cx="25" cy="37" rx="5" ry="6" fill="#1e1b4b"/>
-    <circle cx="27" cy="35" r="2" fill="white"/>
-    <circle cx="24" cy="39" r="1" fill="white"/>
-  </g>
-  <g id="right-eye">
-    <ellipse cx="40" cy="36" rx="8" ry="9" fill="white"/>
-    <ellipse cx="41" cy="37" rx="5" ry="6" fill="#1e1b4b"/>
-    <circle cx="43" cy="35" r="2" fill="white"/>
-    <circle cx="40" cy="39" r="1" fill="white"/>
-  </g>
+  <!-- Smile -->
+  <rect x="13" y="21" width="1" height="1" fill="#000"/>
+  <rect x="14" y="22" width="4" height="1" fill="#000"/>
+  <rect x="18" y="21" width="1" height="1" fill="#000"/>
 
-  <!-- Cute smile -->
-  <path d="M28 48 Q32 54 36 48" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round"/>
-
-  <!-- Rosy cheeks -->
-  <ellipse cx="16" cy="42" rx="4" ry="3" fill="#fda4af" opacity="0.7"/>
-  <ellipse cx="48" cy="42" rx="4" ry="3" fill="#fda4af" opacity="0.7"/>
-
-  <!-- Sparkle effects -->
-  <g fill="#fcd34d">
-    <polygon points="8,20 10,24 6,24" />
-    <polygon points="56,24 58,28 54,28" />
-    <rect x="4" y="36" width="3" height="3"/>
-  </g>
+  <!-- Cheek blush -->
+  <rect x="9" y="19" width="2" height="2" fill="#fda4af"/>
+  <rect x="21" y="19" width="2" height="2" fill="#fda4af"/>
 </svg>

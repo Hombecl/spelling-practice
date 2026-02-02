@@ -221,12 +221,14 @@ body {
   animation: pulse-slow 3s ease-in-out infinite;
 }
 
-/* ========== Cute Slime Pet Animations ========== */
-/* Smooth kawaii-style animations for slime characters */
+/* ========== Tamagotchi-style Pet Animations ========== */
+/* Classic pixel art style like Dragon Quest / Tamagotchi */
 
-/* Slime rendering - smooth edges for cute look */
+/* Pixel art rendering - crisp pixelated edges */
 .pixel-art {
-  image-rendering: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
 }
 
 /* Slime idle bounce - smooth and bouncy */
