@@ -31,7 +31,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
-  const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'tesseract' | null>(null);
+  const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | null>(null);
   const [rawOutput, setRawOutput] = useState<string>(''); // Debug: show Gemini raw output
   const [showDebug, setShowDebug] = useState(true); // Default open for debugging
 
@@ -73,7 +73,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
 
     const allWords: string[] = [];
     const allHighlightedWords: string[] = [];
-    let lastSource: 'gemini-ocr' | 'tesseract' | null = null;
+    let lastSource: 'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | null = null;
 
     // Pass scan options to OCR
     const colorsArray = Array.from(selectedColors);
@@ -719,7 +719,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
                 </p>
                 {ocrSource && (
                   <p className="text-xs text-gray-400 mt-1">
-                    {ocrSource === 'gemini-ocr' ? '🤖 Gemini AI OCR' : '📝 本地 OCR'}
+                    {ocrSource === 'tesseract' ? '📝 本地 OCR' : '🤖 AI OCR'}
                   </p>
                 )}
               </div>

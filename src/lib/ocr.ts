@@ -8,7 +8,9 @@ export interface OCRResult {
   rawText: string;
   confidence: number;
   error?: string;
-  source?: 'gemini-ocr' | 'tesseract';
+  source?: 'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract';
+  modelUsed?: string;
+  fallbackReason?: string;
 }
 
 // Gemini OCR API response type
@@ -20,6 +22,8 @@ interface GeminiOCRResponse {
   source: string;
   error?: string;
   useLocalOCR?: boolean;
+  modelUsed?: string;
+  fallbackReason?: string;
 }
 
 // OCR scan options
@@ -243,7 +247,9 @@ async function tryGeminiOCR(
       highlightedWords: data.highlightedWords || [],
       rawText: data.rawText || '',
       confidence: 95, // Gemini Vision is generally very accurate
-      source: 'gemini-ocr',
+      source: data.source as OCRResult['source'] || 'gemini-ocr',
+      modelUsed: data.modelUsed,
+      fallbackReason: data.fallbackReason,
     };
   } catch (error) {
     console.log('[OCR] Gemini OCR failed, falling back to Tesseract:', error);
