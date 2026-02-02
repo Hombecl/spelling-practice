@@ -1,110 +1,68 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" shape-rendering="crispEdges">
-  <!-- Pixel Teen Dragon - Stage 4 -->
-  <!-- Adolescent: bigger wings, longer horns, cooler look -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Teen Slime - Stage 4 -->
+  <!-- Bigger with proper wings and cool expression -->
 
   <!-- Shadow -->
-  <rect x="6" y="26" width="16" height="1" fill="#7c3aed" opacity="0.4"/>
+  <ellipse cx="32" cy="60" rx="22" ry="4" fill="#7c3aed" opacity="0.4"/>
 
-  <!-- Tail (long with multiple spikes) -->
-  <rect x="21" y="17" width="2" height="1" fill="#a78bfa"/>
-  <rect x="22" y="18" width="2" height="1" fill="#a78bfa"/>
-  <rect x="23" y="19" width="2" height="1" fill="#8b5cf6"/>
-  <rect x="24" y="20" width="2" height="1" fill="#8b5cf6"/>
-  <rect x="25" y="21" width="2" height="1" fill="#7c3aed"/>
-  <!-- Tail spikes -->
-  <rect x="24" y="18" width="1" height="1" fill="#6d28d9"/>
-  <rect x="26" y="20" width="1" height="1" fill="#6d28d9"/>
+  <!-- Wings - left -->
+  <path d="M4 24 Q0 32 4 40 Q12 36 16 32 Q12 28 4 24" fill="#e9d5ff"/>
+  <path d="M6 26 Q4 32 6 38 Q12 35 14 32 Q12 29 6 26" fill="#f3e8ff"/>
 
-  <!-- Wings (larger, more detailed) -->
-  <rect x="2" y="10" width="6" height="7" fill="#ddd6fe"/>
-  <rect x="1" y="11" width="2" height="4" fill="#e9d5ff"/>
-  <rect x="0" y="12" width="1" height="2" fill="#f5f3ff"/>
-  <rect x="22" y="10" width="6" height="7" fill="#ddd6fe"/>
-  <rect x="27" y="11" width="1" height="4" fill="#e9d5ff"/>
-  <!-- Wing bones -->
-  <rect x="3" y="11" width="1" height="4" fill="#c4b5fd"/>
-  <rect x="4" y="12" width="1" height="3" fill="#c4b5fd"/>
-  <rect x="23" y="11" width="1" height="4" fill="#c4b5fd"/>
-  <rect x="24" y="12" width="1" height="3" fill="#c4b5fd"/>
+  <!-- Wings - right -->
+  <path d="M60 24 Q64 32 60 40 Q52 36 48 32 Q52 28 60 24" fill="#e9d5ff"/>
+  <path d="M58 26 Q60 32 58 38 Q52 35 50 32 Q52 29 58 26" fill="#f3e8ff"/>
 
-  <!-- Body (more muscular) -->
-  <rect x="8" y="14" width="12" height="7" fill="#a78bfa"/>
-  <rect x="7" y="15" width="1" height="5" fill="#a78bfa"/>
-  <rect x="20" y="15" width="1" height="5" fill="#a78bfa"/>
+  <!-- Main slime body -->
+  <ellipse cx="32" cy="42" rx="24" ry="20" fill="#8b5cf6"/>
 
-  <!-- Belly scales -->
-  <rect x="10" y="15" width="8" height="5" fill="#fef3c7"/>
-  <rect x="11" y="16" width="6" height="1" fill="#fde68a" opacity="0.6"/>
-  <rect x="11" y="18" width="6" height="1" fill="#fde68a" opacity="0.6"/>
+  <!-- Inner glow layer -->
+  <ellipse cx="32" cy="40" rx="20" ry="16" fill="#a78bfa"/>
 
-  <!-- Arms -->
-  <rect x="6" y="16" width="2" height="3" fill="#8b5cf6"/>
-  <rect x="20" y="16" width="2" height="3" fill="#8b5cf6"/>
-  <!-- Claws -->
-  <rect x="5" y="18" width="1" height="2" fill="#6d28d9"/>
-  <rect x="22" y="18" width="1" height="2" fill="#6d28d9"/>
+  <!-- Top highlight -->
+  <ellipse cx="32" cy="36" rx="14" ry="10" fill="#c4b5fd"/>
 
-  <!-- Feet -->
-  <rect x="8" y="21" width="4" height="3" fill="#8b5cf6"/>
-  <rect x="16" y="21" width="4" height="3" fill="#8b5cf6"/>
-  <!-- Claws -->
-  <rect x="7" y="24" width="1" height="1" fill="#6d28d9"/>
-  <rect x="9" y="24" width="1" height="1" fill="#6d28d9"/>
-  <rect x="11" y="24" width="1" height="1" fill="#6d28d9"/>
-  <rect x="16" y="24" width="1" height="1" fill="#6d28d9"/>
-  <rect x="18" y="24" width="1" height="1" fill="#6d28d9"/>
-  <rect x="20" y="24" width="1" height="1" fill="#6d28d9"/>
+  <!-- Big shine -->
+  <ellipse cx="22" cy="30" rx="6" ry="8" fill="white" opacity="0.4"/>
 
-  <!-- Head -->
-  <rect x="7" y="3" width="14" height="10" fill="#a78bfa"/>
-  <rect x="8" y="2" width="12" height="1" fill="#a78bfa"/>
-  <rect x="8" y="13" width="12" height="1" fill="#a78bfa"/>
+  <!-- Cool horns -->
+  <polygon points="20,20 16,6 24,16" fill="#8b5cf6"/>
+  <polygon points="18,18 17,10 22,15" fill="#a78bfa"/>
 
-  <!-- Longer horns -->
-  <rect x="5" y="0" width="3" height="5" fill="#7c3aed"/>
-  <rect x="4" y="2" width="1" height="2" fill="#8b5cf6"/>
-  <rect x="20" y="0" width="3" height="5" fill="#7c3aed"/>
-  <rect x="23" y="2" width="1" height="2" fill="#8b5cf6"/>
-  <!-- Horn tips -->
-  <rect x="5" y="0" width="1" height="1" fill="#fcd34d"/>
-  <rect x="22" y="0" width="1" height="1" fill="#fcd34d"/>
+  <polygon points="44,20 48,6 40,16" fill="#8b5cf6"/>
+  <polygon points="46,18 47,10 42,15" fill="#a78bfa"/>
 
-  <!-- Back spines -->
-  <rect x="11" y="1" width="2" height="2" fill="#6d28d9"/>
-  <rect x="15" y="1" width="2" height="2" fill="#6d28d9"/>
+  <!-- Confident eyes -->
+  <g id="left-eye">
+    <ellipse cx="24" cy="40" rx="7" ry="7" fill="white"/>
+    <ellipse cx="25" cy="41" rx="4" ry="5" fill="#1e1b4b"/>
+    <circle cx="27" cy="39" r="2" fill="white"/>
+    <!-- Cool eyebrow -->
+    <rect x="18" y="32" width="10" height="2" fill="#5b21b6" rx="1"/>
+  </g>
+  <g id="right-eye">
+    <ellipse cx="40" cy="40" rx="7" ry="7" fill="white"/>
+    <ellipse cx="41" cy="41" rx="4" ry="5" fill="#1e1b4b"/>
+    <circle cx="43" cy="39" r="2" fill="white"/>
+    <!-- Cool eyebrow -->
+    <rect x="36" y="32" width="10" height="2" fill="#5b21b6" rx="1"/>
+  </g>
 
-  <!-- Eyes (slightly narrower - cooler look) -->
-  <rect x="9" y="5" width="3" height="3" fill="#ffffff"/>
-  <rect x="16" y="5" width="3" height="3" fill="#ffffff"/>
+  <!-- Confident smirk -->
+  <path d="M26 52 Q32 56 38 52" stroke="#5b21b6" stroke-width="3" fill="none" stroke-linecap="round"/>
 
-  <!-- Pupils -->
-  <rect x="10" y="6" width="2" height="2" fill="#1e1b4b"/>
-  <rect x="17" y="6" width="2" height="2" fill="#1e1b4b"/>
+  <!-- Rosy cheeks -->
+  <ellipse cx="14" cy="46" rx="4" ry="3" fill="#fda4af" opacity="0.6"/>
+  <ellipse cx="50" cy="46" rx="4" ry="3" fill="#fda4af" opacity="0.6"/>
 
-  <!-- Eye shine -->
-  <rect x="11" y="6" width="1" height="1" fill="#ffffff"/>
-  <rect x="18" y="6" width="1" height="1" fill="#ffffff"/>
+  <!-- Magic sparkles -->
+  <g fill="#fcd34d">
+    <polygon points="2,14 4,10 6,14 4,18" />
+    <polygon points="58,10 60,6 62,10 60,14" />
+    <polygon points="32,4 34,0 36,4 34,8" />
+  </g>
 
-  <!-- Confident eyebrows -->
-  <rect x="8" y="4" width="4" height="1" fill="#6d28d9"/>
-  <rect x="16" y="4" width="4" height="1" fill="#6d28d9"/>
-
-  <!-- Snout (more defined) -->
-  <rect x="11" y="9" width="6" height="3" fill="#8b5cf6"/>
-
-  <!-- Nostrils -->
-  <rect x="11" y="10" width="1" height="1" fill="#6d28d9"/>
-  <rect x="16" y="10" width="1" height="1" fill="#6d28d9"/>
-
-  <!-- Slight smirk -->
-  <rect x="12" y="11" width="4" height="1" fill="#6d28d9"/>
-  <rect x="16" y="10" width="1" height="1" fill="#6d28d9"/>
-
-  <!-- Small flame from nostril -->
-  <rect x="10" y="9" width="1" height="1" fill="#f97316"/>
-  <rect x="17" y="9" width="1" height="1" fill="#f97316"/>
-
-  <!-- Sparkles -->
-  <rect x="1" y="6" width="1" height="1" fill="#fcd34d"/>
-  <rect x="26" y="8" width="1" height="1" fill="#fcd34d"/>
+  <!-- Glow effect dots -->
+  <circle cx="8" cy="44" r="2" fill="#c4b5fd" opacity="0.6"/>
+  <circle cx="56" cy="44" r="2" fill="#c4b5fd" opacity="0.6"/>
 </svg>

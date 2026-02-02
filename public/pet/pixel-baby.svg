@@ -1,64 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" shape-rendering="crispEdges">
-  <!-- Pixel Baby Dragon - Stage 2 -->
-  <!-- Kawaii style: big head, tiny body, huge sparkly eyes -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" shape-rendering="crispEdges">
+  <!-- Cute Baby Slime - Stage 2 -->
+  <!-- Round bouncy slime with huge kawaii eyes -->
 
   <!-- Shadow -->
-  <rect x="6" y="18" width="8" height="1" fill="#c4b5fd" opacity="0.5"/>
+  <ellipse cx="32" cy="58" rx="18" ry="5" fill="#a78bfa" opacity="0.4"/>
 
-  <!-- Tiny tail -->
-  <rect x="15" y="14" width="2" height="1" fill="#a78bfa"/>
-  <rect x="16" y="15" width="1" height="1" fill="#8b5cf6"/>
+  <!-- Main slime body - big round blob -->
+  <ellipse cx="32" cy="38" rx="22" ry="20" fill="#c4b5fd"/>
 
-  <!-- Body (small and round) -->
-  <rect x="7" y="13" width="6" height="3" fill="#c4b5fd"/>
-  <rect x="8" y="16" width="4" height="1" fill="#c4b5fd"/>
+  <!-- Inner highlight layer -->
+  <ellipse cx="32" cy="36" rx="18" ry="16" fill="#ddd6fe"/>
 
-  <!-- Belly -->
-  <rect x="8" y="14" width="4" height="2" fill="#fef3c7"/>
+  <!-- Big shine highlight -->
+  <ellipse cx="24" cy="28" rx="8" ry="10" fill="white" opacity="0.5"/>
 
-  <!-- Tiny feet -->
-  <rect x="7" y="17" width="2" height="1" fill="#a78bfa"/>
-  <rect x="11" y="17" width="2" height="1" fill="#a78bfa"/>
+  <!-- Tiny antenna/bump on top -->
+  <ellipse cx="32" cy="16" rx="4" ry="6" fill="#c4b5fd"/>
+  <circle cx="32" cy="12" r="3" fill="#ddd6fe"/>
 
-  <!-- Wing nubs -->
-  <rect x="5" y="13" width="2" height="2" fill="#ddd6fe"/>
-  <rect x="13" y="13" width="2" height="2" fill="#ddd6fe"/>
+  <!-- HUGE kawaii eyes -->
+  <g id="left-eye">
+    <ellipse cx="24" cy="36" rx="8" ry="9" fill="white"/>
+    <ellipse cx="25" cy="37" rx="5" ry="6" fill="#1e1b4b"/>
+    <circle cx="27" cy="35" r="2" fill="white"/>
+    <circle cx="24" cy="39" r="1" fill="white"/>
+  </g>
+  <g id="right-eye">
+    <ellipse cx="40" cy="36" rx="8" ry="9" fill="white"/>
+    <ellipse cx="41" cy="37" rx="5" ry="6" fill="#1e1b4b"/>
+    <circle cx="43" cy="35" r="2" fill="white"/>
+    <circle cx="40" cy="39" r="1" fill="white"/>
+  </g>
 
-  <!-- Head (BIG for kawaii look) -->
-  <rect x="5" y="3" width="10" height="9" fill="#c4b5fd"/>
-  <rect x="6" y="2" width="8" height="1" fill="#c4b5fd"/>
-  <rect x="6" y="12" width="8" height="1" fill="#c4b5fd"/>
+  <!-- Cute smile -->
+  <path d="M28 48 Q32 54 36 48" stroke="#7c3aed" stroke-width="2" fill="none" stroke-linecap="round"/>
 
-  <!-- Ear bumps -->
-  <rect x="4" y="3" width="2" height="3" fill="#ddd6fe"/>
-  <rect x="14" y="3" width="2" height="3" fill="#ddd6fe"/>
+  <!-- Rosy cheeks -->
+  <ellipse cx="16" cy="42" rx="4" ry="3" fill="#fda4af" opacity="0.7"/>
+  <ellipse cx="48" cy="42" rx="4" ry="3" fill="#fda4af" opacity="0.7"/>
 
-  <!-- Eyes (huge and sparkly) -->
-  <rect x="6" y="5" width="3" height="4" fill="#ffffff"/>
-  <rect x="11" y="5" width="3" height="4" fill="#ffffff"/>
-
-  <!-- Pupils -->
-  <rect x="7" y="6" width="2" height="2" fill="#1e1b4b"/>
-  <rect x="12" y="6" width="2" height="2" fill="#1e1b4b"/>
-
-  <!-- Eye shine -->
-  <rect x="8" y="6" width="1" height="1" fill="#ffffff"/>
-  <rect x="13" y="6" width="1" height="1" fill="#ffffff"/>
-
-  <!-- Blush -->
-  <rect x="5" y="8" width="2" height="1" fill="#fda4af"/>
-  <rect x="13" y="8" width="2" height="1" fill="#fda4af"/>
-
-  <!-- Nose -->
-  <rect x="9" y="8" width="2" height="1" fill="#8b5cf6"/>
-
-  <!-- Happy mouth -->
-  <rect x="8" y="10" width="1" height="1" fill="#7c3aed"/>
-  <rect x="9" y="11" width="2" height="1" fill="#7c3aed"/>
-  <rect x="11" y="10" width="1" height="1" fill="#7c3aed"/>
-
-  <!-- Sparkles around (showing cuteness) -->
-  <rect x="2" y="4" width="1" height="1" fill="#fcd34d"/>
-  <rect x="17" y="6" width="1" height="1" fill="#fcd34d"/>
-  <rect x="3" y="10" width="1" height="1" fill="#fcd34d"/>
+  <!-- Sparkle effects -->
+  <g fill="#fcd34d">
+    <polygon points="8,20 10,24 6,24" />
+    <polygon points="56,24 58,28 54,28" />
+    <rect x="4" y="36" width="3" height="3"/>
+  </g>
 </svg>
