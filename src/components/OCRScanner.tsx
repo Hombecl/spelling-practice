@@ -100,9 +100,10 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
       );
 
       if (result.success) {
-        // Store raw output for debugging
+        // Store raw output for debugging (include model info)
         if (result.rawText) {
-          setRawOutput(prev => prev ? prev + '\n\n---IMAGE---\n\n' + result.rawText : result.rawText);
+          const debugInfo = result.modelUsed ? `[Model: ${result.modelUsed}]${result.fallbackReason ? ` (${result.fallbackReason})` : ''}\n\n` : '';
+          setRawOutput(prev => prev ? prev + '\n\n---IMAGE---\n\n' + debugInfo + result.rawText : debugInfo + result.rawText);
         }
 
         // Filter to valid words and add to collection (avoid duplicates)

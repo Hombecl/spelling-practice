@@ -147,10 +147,12 @@ export async function POST(request: NextRequest) {
     });
 
     let modelUsed = MODEL;
+    let fallbackReason = '';
 
     // If GPT-4o fails, try fallback
     if (!response.ok) {
-      console.log('[OCR] GPT-4o failed, trying fallback model');
+      fallbackReason = `GPT-4o failed with status ${response.status}`;
+      console.log('[OCR] GPT-4o failed, trying fallback model:', response.status);
       response = await fetch(OPENROUTER_API_URL, {
         method: 'POST',
         headers: {
@@ -207,6 +209,8 @@ export async function POST(request: NextRequest) {
         highlightedWords: [],
         rawText: rawOutput,
         source: modelUsed === MODEL ? 'gpt4o-ocr' : 'gemini-ocr',
+        modelUsed,
+        fallbackReason: fallbackReason || undefined,
       });
     }
 
@@ -219,6 +223,8 @@ export async function POST(request: NextRequest) {
       highlightedWords,
       rawText: rawOutput,
       source: modelUsed === MODEL ? 'gpt4o-ocr' : 'gemini-ocr',
+      modelUsed,
+      fallbackReason: fallbackReason || undefined,
     });
   } catch (error) {
     console.error('OCR API error:', error);
