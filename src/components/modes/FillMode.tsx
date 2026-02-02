@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Word, shuffleArray } from '@/lib/words';
 import { speakEncouragement, speakTryAgain, speakWord } from '@/lib/speech';
 import { speakPhonicsHint, getPhonicsHintForPosition, getSyllables } from '@/lib/phonics';
+import { hapticSuccess, hapticError, hapticWarning } from '@/lib/haptic';
 import LetterButton from '@/components/LetterButton';
 import SpeakButton from '@/components/SpeakButton';
 import StarBurst from '@/components/StarBurst';
@@ -123,6 +124,7 @@ export default function FillMode({ word, onComplete, onSkip, hintLetters = [] }:
       if (nextIndex === -1) {
         // Word complete!
         setShowSuccess(true);
+        hapticSuccess();
         speakEncouragement();
         setTimeout(() => {
           onComplete(true, attempts + 1);
@@ -137,6 +139,7 @@ export default function FillMode({ word, onComplete, onSkip, hintLetters = [] }:
       setErrors(newErrors);
       setAttempts(attempts + 1);
       setIncorrectLetter(letter);
+      hapticError();
       speakTryAgain();
 
       // Start cooldown
@@ -148,6 +151,7 @@ export default function FillMode({ word, onComplete, onSkip, hintLetters = [] }:
 
       // Check if max errors reached
       if (newErrors >= MAX_ERRORS) {
+        hapticWarning();
         setShowReset(true);
         setShowPhonics(true);
       }

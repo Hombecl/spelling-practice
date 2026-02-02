@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { speakWord } from '@/lib/speech';
+import { hapticTap } from '@/lib/haptic';
 
 interface SpeakButtonProps {
   word: string;
@@ -20,6 +21,7 @@ export default function SpeakButton({ word, size = 'lg', label }: SpeakButtonPro
 
   const handleClick = async () => {
     if (isPlaying) return;
+    hapticTap();
     setIsPlaying(true);
     await speakWord(word);
     setIsPlaying(false);

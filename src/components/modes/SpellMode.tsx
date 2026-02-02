@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Word } from '@/lib/words';
 import { speakEncouragement, speakTryAgain, speakWord } from '@/lib/speech';
 import { speakPhonicsHint, getPhonicsHintForPosition, getSyllables, speakSyllables } from '@/lib/phonics';
+import { hapticTap, hapticSuccess, hapticError, hapticWarning } from '@/lib/haptic';
 import SpeakButton from '@/components/SpeakButton';
 import WordDisplay from '@/components/WordDisplay';
 import StarBurst from '@/components/StarBurst';
@@ -115,6 +116,7 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
 
     if (keyLower === expectedLetter.toLowerCase()) {
       // Correct letter
+      hapticTap();
       const newInput = [...userInput, keyLower];
       setUserInput(newInput);
       setCurrentIndex(currentIndex + 1);
@@ -123,6 +125,7 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
       if (newInput.length === word.word.length) {
         // Word complete!
         setShowSuccess(true);
+        hapticSuccess();
         speakEncouragement();
         setTimeout(() => {
           onComplete(true, attempts + 1);
@@ -134,6 +137,7 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
       setErrors(newErrors);
       setAttempts(attempts + 1);
       setIncorrectIndex(currentIndex);
+      hapticError();
       speakTryAgain();
 
       // Show the wrong letter briefly
@@ -150,6 +154,7 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
 
       // Check if max errors reached
       if (newErrors >= MAX_ERRORS) {
+        hapticWarning();
         setShowReset(true);
         setShowPhonics(true);
       }

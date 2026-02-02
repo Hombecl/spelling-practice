@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Word } from '@/lib/words';
 import { speakWord } from '@/lib/speech';
 import { getPhonicsBreakdown, speakSyllables } from '@/lib/phonics';
+import { hapticTap, hapticSuccess, hapticError } from '@/lib/haptic';
 import WordImage from '@/components/WordImage';
 import StarBurst from '@/components/StarBurst';
 
@@ -31,6 +32,7 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
   }, [word]);
 
   const handleListenWord = async () => {
+    hapticTap();
     setIsPlaying(true);
     await speakWord(word.word);
     setIsPlaying(false);
@@ -39,6 +41,7 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
 
   const handlePlaySyllables = async () => {
     if (isPlaying) return;
+    hapticTap();
     setIsPlaying(true);
     setStep('phonics');
 
@@ -59,10 +62,13 @@ export default function PhonicsMode({ word, onComplete, onSkip }: PhonicsModePro
     const correct = syllableCount === breakdown.syllables.length;
 
     if (correct) {
+      hapticSuccess();
       setShowSuccess(true);
       setTimeout(() => {
         onComplete(true, 1);
       }, 1500);
+    } else {
+      hapticError();
     }
   };
 

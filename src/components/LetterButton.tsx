@@ -1,6 +1,7 @@
 'use client';
 
 import { speakLetter } from '@/lib/speech';
+import { hapticTap } from '@/lib/haptic';
 
 interface LetterButtonProps {
   letter: string;
@@ -49,6 +50,7 @@ export default function LetterButton({
 
   const handleClick = () => {
     if (!disabled) {
+      hapticTap();
       speakLetter(letter);
       onClick(letter);
     }

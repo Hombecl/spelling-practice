@@ -68,6 +68,8 @@ import FillMode from '@/components/modes/FillMode';
 import SpellMode from '@/components/modes/SpellMode';
 import ModeSelector from '@/components/ModeSelector';
 import WordListManager from '@/components/WordListManager';
+import SettingsPanel from '@/components/SettingsPanel';
+import ProgressExport from '@/components/ProgressExport';
 import BadgeDisplay from '@/components/BadgeDisplay';
 import ProgressBar from '@/components/ProgressBar';
 import BottomTabBar, { Tab } from '@/components/BottomTabBar';
@@ -1450,6 +1452,12 @@ export default function Home() {
                 />
               </div>
 
+              {/* Sound & Haptic Settings */}
+              <div className="bg-white rounded-2xl p-4 shadow-md">
+                <h2 className="text-lg font-bold text-gray-700 mb-3">🔊 聲音與觸感</h2>
+                <SettingsPanel />
+              </div>
+
               {/* Progress Report */}
               <div className="bg-white rounded-2xl p-4 shadow-md">
                 <h2 className="text-lg font-bold text-gray-700 mb-3">📊 學習進度</h2>
@@ -1487,6 +1495,11 @@ export default function Home() {
                     total={Math.max(Object.keys(progress.wordProgress).length, 1)}
                     label="整體掌握進度"
                   />
+                </div>
+
+                {/* Export Progress */}
+                <div className="mt-4">
+                  <ProgressExport progress={progress} />
                 </div>
               </div>
 
