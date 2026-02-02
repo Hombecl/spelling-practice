@@ -32,8 +32,8 @@ export default function TestPage() {
 
   // Create a test pet state matching the current PetState interface
   const testPet: PetState = {
-    name: '測試龍',
-    species: 'dragon',
+    name: '測試史萊姆',
+    species: 'slime',
     stage: currentStage,
     xp: 50,
     level: level,

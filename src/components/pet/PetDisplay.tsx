@@ -1,33 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import { PetState, PetStage, PetMood, getPetMood, PET_STAGE_NAMES_ZH } from '@/lib/progress';
+import { PetState, PetStage, PetMood, PetSpecies, getPetMood, getPetStageName, getPetSvgPath, PET_SPECIES } from '@/lib/pet';
 
-// Pixel art SVG images for each evolution stage
-const PET_IMAGES: Record<PetStage, string> = {
-  egg: '/pet/pixel-egg.svg',
-  baby: '/pet/pixel-baby.svg',
-  child: '/pet/pixel-child.svg',
-  teen: '/pet/pixel-teen.svg',
-  adult: '/pet/pixel-adult.svg',
-};
-
-// Fallback to original SVGs if pixel versions fail
-const FALLBACK_IMAGES: Record<PetStage, string> = {
-  egg: '/pet/egg.svg',
-  baby: '/pet/baby.svg',
-  child: '/pet/child.svg',
-  teen: '/pet/teen.svg',
-  adult: '/pet/adult.svg',
-};
-
-// Last resort emoji fallbacks
-const FALLBACK_EMOJIS: Record<PetStage, string> = {
-  egg: '🥚',
-  baby: '🐣',
-  child: '🦎',
-  teen: '🐲',
-  adult: '🐉',
+// Fallback emoji by species and stage
+const FALLBACK_EMOJIS: Record<PetSpecies, Record<PetStage, string>> = {
+  slime: { egg: '🥚', baby: '🟢', child: '🟩', teen: '💚', adult: '👑' },
+  unicorn: { egg: '🥚', baby: '🦄', child: '🌸', teen: '💜', adult: '🪽' },
+  dog: { egg: '🥚', baby: '🐕', child: '🐕‍🦺', teen: '🐺', adult: '🔥' },
 };
 
 // Pixel art stage-specific animation classes
@@ -47,6 +27,31 @@ const MOOD_ANIMATIONS: Record<PetMood, string> = {
   sleepy: 'animate-pixel-sleepy',
 };
 
+// Background glow colors by species
+const SPECIES_GLOW_COLORS: Record<PetSpecies, Record<PetStage, string>> = {
+  slime: {
+    egg: 'from-green-100 to-emerald-100',
+    baby: 'from-green-100 to-emerald-100',
+    child: 'from-green-100 to-emerald-100',
+    teen: 'from-green-100 to-emerald-100',
+    adult: 'from-green-200 to-yellow-100',
+  },
+  unicorn: {
+    egg: 'from-pink-100 to-purple-100',
+    baby: 'from-pink-100 to-purple-100',
+    child: 'from-pink-100 to-purple-100',
+    teen: 'from-purple-100 to-violet-100',
+    adult: 'from-purple-200 to-pink-100',
+  },
+  dog: {
+    egg: 'from-amber-100 to-orange-100',
+    baby: 'from-amber-100 to-orange-100',
+    child: 'from-amber-100 to-orange-100',
+    teen: 'from-orange-100 to-red-100',
+    adult: 'from-orange-200 to-red-100',
+  },
+};
+
 interface PetDisplayProps {
   pet: PetState;
   size?: 'small' | 'medium' | 'large';
@@ -63,6 +68,7 @@ export default function PetDisplay({
   onClick,
 }: PetDisplayProps) {
   const mood = getPetMood(pet.happiness, pet.lastFedDate);
+  const species = pet.species || 'slime'; // Default to slime for backward compatibility
 
   // Size configurations - larger for pixel art visibility
   const sizeConfig = {
@@ -99,14 +105,11 @@ export default function PetDisplay({
     return STAGE_ANIMATIONS[pet.stage];
   };
 
-  // Background glow color based on stage
-  const stageGlowColors: Record<PetStage, string> = {
-    egg: 'from-purple-100 to-violet-100',
-    baby: 'from-purple-100 to-pink-100',
-    child: 'from-violet-100 to-purple-100',
-    teen: 'from-purple-100 to-indigo-100',
-    adult: 'from-purple-200 to-yellow-100',
-  };
+  // Get glow color based on species
+  const glowColor = SPECIES_GLOW_COLORS[species]?.[pet.stage] || 'from-gray-100 to-gray-100';
+
+  // Get pet image path
+  const imagePath = getPetSvgPath(species, pet.stage);
 
   return (
     <div
@@ -122,7 +125,7 @@ export default function PetDisplay({
           ${config.container}
           relative flex items-center justify-center
           rounded-2xl
-          bg-gradient-to-b ${stageGlowColors[pet.stage]}
+          bg-gradient-to-b ${glowColor}
           shadow-lg
           ${mood === 'happy' ? 'ring-4 ring-yellow-300/50' : ''}
           ${mood === 'hungry' || mood === 'sleepy' ? 'opacity-80' : ''}
@@ -144,8 +147,8 @@ export default function PetDisplay({
         {/* Pet Pixel Art Image with animations */}
         <div className={`${config.container} ${getAnimationClass()} p-2 pixel-art flex items-center justify-center`}>
           <Image
-            src={PET_IMAGES[pet.stage]}
-            alt={`${pet.name} - ${PET_STAGE_NAMES_ZH[pet.stage]}`}
+            src={imagePath}
+            alt={`${pet.name} - ${getPetStageName(species, pet.stage)}`}
             width={config.imageSize}
             height={config.imageSize}
             className="w-full h-full object-contain pixel-art"
@@ -154,20 +157,15 @@ export default function PetDisplay({
             }}
             priority
             onError={(e) => {
-              // Try fallback to original SVG first
+              // Fallback to emoji
               const target = e.target as HTMLImageElement;
-              if (target.src.includes('pixel-')) {
-                target.src = FALLBACK_IMAGES[pet.stage];
-              } else {
-                // Final fallback to emoji
-                target.style.display = 'none';
-                const parent = target.parentElement;
-                if (parent) {
-                  const emoji = document.createElement('span');
-                  emoji.className = `${config.emoji}`;
-                  emoji.textContent = FALLBACK_EMOJIS[pet.stage];
-                  parent.appendChild(emoji);
-                }
+              target.style.display = 'none';
+              const parent = target.parentElement;
+              if (parent) {
+                const emoji = document.createElement('span');
+                emoji.className = `${config.emoji}`;
+                emoji.textContent = FALLBACK_EMOJIS[species]?.[pet.stage] || '🥚';
+                parent.appendChild(emoji);
               }
             }}
           />
@@ -187,7 +185,7 @@ export default function PetDisplay({
           </div>
         )}
 
-        {/* Sparkle effects for adult dragon */}
+        {/* Sparkle effects for adult stage */}
         {pet.stage === 'adult' && mood === 'happy' && (
           <>
             <div className="absolute top-2 left-2 text-yellow-400 animate-pixel-sparkle text-sm">✦</div>
@@ -203,7 +201,7 @@ export default function PetDisplay({
             {pet.name}
           </div>
           <div className="text-xs text-gray-500">
-            Lv.{pet.level} {PET_STAGE_NAMES_ZH[pet.stage]}
+            Lv.{pet.level} {getPetStageName(species, pet.stage)}
           </div>
         </div>
       )}

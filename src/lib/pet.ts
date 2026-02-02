@@ -7,7 +7,66 @@
 
 export type PetStage = 'egg' | 'baby' | 'child' | 'teen' | 'adult';
 export type PetMood = 'happy' | 'content' | 'hungry' | 'sleepy';
-export type PetSpecies = 'dragon'; // Future: 'bunny' | 'fox' | 'panda' | 'phoenix'
+export type PetSpecies = 'slime' | 'unicorn' | 'dog';
+
+// Species info for selection screen
+export interface PetSpeciesInfo {
+  id: PetSpecies;
+  nameZh: string;
+  descriptionZh: string;
+  emoji: string;
+  color: string;            // Primary color for UI
+  stageNames: Record<PetStage, string>;
+  finalFormName: string;    // Name of adult form
+}
+
+export const PET_SPECIES: Record<PetSpecies, PetSpeciesInfo> = {
+  slime: {
+    id: 'slime',
+    nameZh: '史萊姆',
+    descriptionZh: '可愛嘅綠色史萊姆，長大後會變成帝王史萊姆！',
+    emoji: '🟢',
+    color: '#22c55e',
+    stageNames: {
+      egg: '史萊姆蛋',
+      baby: 'BB史萊姆',
+      child: '小史萊姆',
+      teen: '少年史萊姆',
+      adult: '帝王史萊姆',
+    },
+    finalFormName: '帝王史萊姆',
+  },
+  unicorn: {
+    id: 'unicorn',
+    nameZh: '獨角獸',
+    descriptionZh: '夢幻嘅粉紅獨角獸，長大後會變成天馬！',
+    emoji: '🦄',
+    color: '#ec4899',
+    stageNames: {
+      egg: '獨角獸蛋',
+      baby: 'BB獨角獸',
+      child: '小獨角獸',
+      teen: '少年獨角獸',
+      adult: '天馬獨角獸',
+    },
+    finalFormName: '天馬獨角獸',
+  },
+  dog: {
+    id: 'dog',
+    nameZh: '小狗',
+    descriptionZh: '忠誠嘅小狗，長大後會變成神話中嘅哮天犬！',
+    emoji: '🐕',
+    color: '#d97706',
+    stageNames: {
+      egg: '小狗蛋',
+      baby: 'BB狗仔',
+      child: '小狗仔',
+      teen: '少年狼犬',
+      adult: '哮天犬',
+    },
+    finalFormName: '哮天犬',
+  },
+};
 
 export type SkillEffectType =
   | 'hint_reveal'
@@ -149,7 +208,7 @@ export const EVOLUTION_THRESHOLDS: Record<PetStage, { minLevel: number; minXP: n
   adult: { minLevel: 51, minXP: 4000 }
 };
 
-// Pet visuals by stage
+// Pet visuals by stage (for backward compatibility - use PET_SPECIES for new code)
 export const PET_EMOJIS: Record<PetStage, string> = {
   egg: '🥚',
   baby: '🐣',
@@ -158,7 +217,7 @@ export const PET_EMOJIS: Record<PetStage, string> = {
   adult: '🐉'
 };
 
-// Pet stage names in Chinese
+// Pet stage names in Chinese (default - use getPetStageName for species-specific)
 export const PET_STAGE_NAMES_ZH: Record<PetStage, string> = {
   egg: '蛋蛋',
   baby: 'BB仔',
@@ -166,6 +225,16 @@ export const PET_STAGE_NAMES_ZH: Record<PetStage, string> = {
   teen: '少年龍',
   adult: '成年龍'
 };
+
+// Get species-specific stage name
+export function getPetStageName(species: PetSpecies, stage: PetStage): string {
+  return PET_SPECIES[species]?.stageNames[stage] || PET_STAGE_NAMES_ZH[stage];
+}
+
+// Get pet SVG path by species and stage
+export function getPetSvgPath(species: PetSpecies, stage: PetStage): string {
+  return `/pet/${species}-${stage}.svg`;
+}
 
 // CSS animation classes by stage
 export const PET_ANIMATIONS: Record<PetStage, string> = {
@@ -947,16 +1016,24 @@ export function cleanupExpiredEffects(activeEffects: ActiveEffect[]): ActiveEffe
   return activeEffects.filter(effect => new Date(effect.expiresAt) > now);
 }
 
+// Default pet names by species
+export const DEFAULT_PET_NAMES: Record<PetSpecies, string> = {
+  slime: '小綠綠',
+  unicorn: '小彩虹',
+  dog: '小旺旺',
+};
+
 /**
  * Create default pet state for new users
  */
-export function createDefaultPet(name: string = '小龍龍'): PetState {
+export function createDefaultPet(name?: string, species: PetSpecies = 'slime'): PetState {
   const now = new Date().toISOString();
   const today = now.split('T')[0];
+  const petName = name || DEFAULT_PET_NAMES[species];
 
   return {
-    name,
-    species: 'dragon',
+    name: petName,
+    species,
     stage: 'egg',
     xp: 0,
     level: 1,

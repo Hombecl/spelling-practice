@@ -17,6 +17,7 @@ import {
   PET_SKILLS,
   isSkillOnCooldown,
   getSkillCooldownRemaining,
+  initializePet,
   // Interaction imports
   patPet,
   feedPetWithFood,
@@ -95,6 +96,8 @@ import MnemonicHint from '@/components/MnemonicHint';
 import { SpellingTestStage, onSpellingTestAdded, getAdaptiveWords } from '@/lib/adaptiveLevel';
 import SpellingTestChallenge from '@/components/adventure/SpellingTestChallenge';
 import PetDisplay from '@/components/pet/PetDisplay';
+import PetSelection from '@/components/pet/PetSelection';
+import { PetSpecies } from '@/lib/pet';
 
 type PetScreen = 'main' | 'shop' | 'badges';
 type AdventureScreen = 'map' | 'stage' | 'boss' | 'spelling-test';
@@ -337,7 +340,7 @@ export default function Home() {
         newProgress.isFirstSessionToday,
         newProgress.streakDays,
         newProgress.currentMode,
-        newProgress.pet.activeEffects
+        newProgress.pet?.activeEffects || []
       );
 
       const { progress: xpProgress, evolution } = addXP(xpCalc.totalXP, newProgress);
@@ -363,9 +366,9 @@ export default function Home() {
       }
 
       // Check for item drops
-      const hasLuckyCharm = newProgress.pet.equippedItems.includes('lucky_charm');
+      const hasLuckyCharm = newProgress.pet?.equippedItems?.includes('lucky_charm') || false;
       const itemDrop = calculateItemDrop(starsEarned, hasLuckyCharm);
-      if (itemDrop) {
+      if (itemDrop && newProgress.pet) {
         newProgress = {
           ...newProgress,
           pet: {
@@ -420,7 +423,7 @@ export default function Home() {
 
   // Handle using peek skill
   const handleUsePeekSkill = (skillId: 'peek' | 'double_peek') => {
-    if (!progress || !currentWord) return;
+    if (!progress || !currentWord || !progress.pet) return;
 
     const skill = PET_SKILLS.find(s => s.id === skillId);
     if (!skill) return;
@@ -476,7 +479,7 @@ export default function Home() {
   };
 
   const handleAdventureStageComplete = (stars: number, xpEarned: number) => {
-    if (!progress || !currentWorldId || !currentStageNum) return;
+    if (!progress || !currentWorldId || !currentStageNum || !progress.pet) return;
 
     // Update adventure progress
     const adventureProgress = progress.adventureProgress || createDefaultAdventureProgress();
@@ -516,7 +519,7 @@ export default function Home() {
   };
 
   const handleAdventureBossVictory = (time: number) => {
-    if (!progress || !currentWorldId) return;
+    if (!progress || !currentWorldId || !progress.pet) return;
 
     const world = getWorldById(currentWorldId);
     if (!world) return;
@@ -605,6 +608,17 @@ export default function Home() {
         <div className="text-2xl animate-pulse">載入中...</div>
       </div>
     );
+  }
+
+  // Show pet selection for new users
+  if (!progress.petSelected || !progress.pet) {
+    const handlePetSelect = (species: PetSpecies, name: string) => {
+      const newProgress = initializePet(species, name, progress);
+      setProgress(newProgress);
+      saveProgress(newProgress);
+    };
+
+    return <PetSelection onSelect={handlePetSelect} />;
   }
 
   // Get active word list for display
@@ -835,7 +849,7 @@ export default function Home() {
             )}
 
             {/* Skill Buttons */}
-            {(progress.currentMode === 'fill' || progress.currentMode === 'spell') && (
+            {(progress.currentMode === 'fill' || progress.currentMode === 'spell') && progress.pet && (
               <div className="mt-4 flex justify-center gap-3 flex-wrap">
                 {progress.pet.unlockedSkills.includes('peek') && (
                   <button
@@ -908,7 +922,7 @@ export default function Home() {
         )}
 
         {/* PET TAB - Main Screen */}
-        {activeTab === 'pet' && petScreen === 'main' && (
+        {activeTab === 'pet' && petScreen === 'main' && progress.pet && (
           <div className="py-4 sm:py-8">
             {/* Pet Display */}
             <div className="flex flex-col items-center gap-4">
@@ -962,7 +976,7 @@ export default function Home() {
                   {[...Array(MAX_PATS_PER_DAY)].map((_, i) => (
                     <span
                       key={i}
-                      className={`text-lg ${i < (progress.pet.patsToday || 0) ? 'opacity-30' : ''}`}
+                      className={`text-lg ${i < (progress.pet?.patsToday || 0) ? 'opacity-30' : ''}`}
                     >
                       🖐️
                     </span>
@@ -974,7 +988,7 @@ export default function Home() {
               <div className="text-center">
                 <button
                   onClick={() => {
-                    setNewPetName(progress.pet.name);
+                    setNewPetName(progress.pet?.name || '');
                     setShowRenameModal(true);
                   }}
                   className="group flex items-center justify-center gap-2 hover:bg-gray-100 rounded-xl px-4 py-2 transition-colors"
@@ -1172,6 +1186,7 @@ export default function Home() {
                           <button
                             key={idx}
                             onClick={() => {
+                              if (!progress.pet) return;
                               const result = useItem(invItem.itemId, progress.pet);
                               if (result.success) {
                                 const newProgress = {
@@ -1248,7 +1263,7 @@ export default function Home() {
                       const skill = PET_SKILLS.find(s => s.id === skillId);
                       if (!skill) return null;
 
-                      const isActive = progress.pet.activeEffects.some(
+                      const isActive = (progress.pet?.activeEffects || []).some(
                         e => e.skillId === skillId && new Date(e.expiresAt) > new Date()
                       );
 
@@ -1289,7 +1304,7 @@ export default function Home() {
         )}
 
         {/* PET TAB - Shop Screen */}
-        {activeTab === 'pet' && petScreen === 'shop' && (
+        {activeTab === 'pet' && petScreen === 'shop' && progress.pet && (
           <div className="py-4 sm:py-8">
             <button
               onClick={() => setPetScreen('main')}
@@ -1346,6 +1361,7 @@ export default function Home() {
                       </div>
                       <button
                         onClick={() => {
+                          if (!progress.pet) return;
                           const result = buyItem(item.id, progress.totalStars, progress.pet.itemInventory);
                           if (result.success) {
                             const newProgress = {

@@ -78,7 +78,8 @@ export interface UserProgress {
   totalWordsLearned: number;
 
   // Pet system
-  pet: PetState;
+  pet: PetState | null;  // null = new user needs to choose pet
+  petSelected: boolean;  // false = show pet selection screen
   totalXP: number;
   xpEarnedToday: number;
   lastXPDate: string;
@@ -109,8 +110,9 @@ const defaultProgress: UserProgress = {
   lastPlayedDate: '',
   totalWordsLearned: 0,
 
-  // Pet system defaults
-  pet: createDefaultPet(),
+  // Pet system defaults - null means new user needs to select pet
+  pet: null,
+  petSelected: false,
   totalXP: 0,
   xpEarnedToday: 0,
   lastXPDate: '',
@@ -143,13 +145,25 @@ export function getProgress(): UserProgress {
  * Migrate old progress data to include pet system
  */
 function migrateProgress(progress: UserProgress): UserProgress {
-  // If pet already exists and has valid data, no migration needed
-  if (progress.pet && progress.pet.species && progress.pet.birthDate) {
-    return progress;
+  // New user without pet selected - don't auto-create pet
+  if (!progress.petSelected && !progress.pet) {
+    return {
+      ...progress,
+      pet: null,
+      petSelected: false,
+    };
   }
 
-  // Create default pet for existing users
-  const defaultPet = createDefaultPet();
+  // If pet already exists and has valid data, ensure petSelected is true
+  if (progress.pet && progress.pet.species && progress.pet.birthDate) {
+    return {
+      ...progress,
+      petSelected: true,
+    };
+  }
+
+  // Old user with invalid pet data - create default slime pet
+  const defaultPet = createDefaultPet(undefined, 'slime');
 
   // Reward existing users with XP based on their stars
   const bonusXP = Math.floor((progress.totalStars || 0) * 2);
@@ -173,6 +187,7 @@ function migrateProgress(progress: UserProgress): UserProgress {
       unlockedSkills: getUnlockedSkills(initialLevel).map(s => s.id),
       evolvedAt: evolvedAt as PetState['evolvedAt'],
     },
+    petSelected: true,
     totalXP: bonusXP,
     xpEarnedToday: 0,
     lastXPDate: '',
@@ -185,6 +200,11 @@ function migrateProgress(progress: UserProgress): UserProgress {
  * Apply daily updates: happiness decay, check first session, cleanup effects, reset daily tasks
  */
 function applyDailyUpdates(progress: UserProgress): UserProgress {
+  // Skip if no pet selected yet
+  if (!progress.pet) {
+    return progress;
+  }
+
   const today = new Date().toISOString().split('T')[0];
   const isFirstSession = progress.lastXPDate !== today;
   const isNewDay = progress.pet.lastPatDate !== today;
@@ -256,6 +276,28 @@ export function saveProgress(progress: UserProgress): void {
   } catch (e) {
     console.error('Error saving progress:', e);
   }
+}
+
+/**
+ * Initialize pet for new user after selection
+ */
+export function initializePet(
+  species: import('./pet').PetSpecies,
+  name: string,
+  progress: UserProgress
+): UserProgress {
+  const newPet = createDefaultPet(name, species);
+
+  return {
+    ...progress,
+    pet: newPet,
+    petSelected: true,
+    totalXP: 0,
+    xpEarnedToday: 0,
+    lastXPDate: '',
+    isFirstSessionToday: true,
+    wordsCompletedToday: 0,
+  };
 }
 
 export function updateWordProgress(
@@ -476,6 +518,11 @@ export interface EvolutionResult {
  * Add XP to the pet and check for evolution
  */
 export function addXP(amount: number, progress: UserProgress): { progress: UserProgress; evolution: EvolutionResult | null } {
+  // If no pet, just add XP without pet updates
+  if (!progress.pet) {
+    return { progress: { ...progress, totalXP: progress.totalXP + amount }, evolution: null };
+  }
+
   const newTotalXP = progress.totalXP + amount;
   const newLevel = getLevelFromXP(newTotalXP);
   const oldStage = progress.pet.stage;
@@ -529,6 +576,8 @@ export function addXP(amount: number, progress: UserProgress): { progress: UserP
  * Feed the pet (called when completing a word)
  */
 export function feedPet(progress: UserProgress): UserProgress {
+  if (!progress.pet) return progress;
+
   const today = new Date().toISOString().split('T')[0];
   const isNewDay = progress.pet.lastFedDate !== today;
 
@@ -549,6 +598,8 @@ export function feedPet(progress: UserProgress): UserProgress {
  * Activate a pet skill
  */
 export function activateSkill(skillId: string, progress: UserProgress): UserProgress {
+  if (!progress.pet) return progress;
+
   const skill = PET_SKILLS.find(s => s.id === skillId);
   if (!skill) return progress;
 
@@ -585,6 +636,8 @@ export function activateSkill(skillId: string, progress: UserProgress): UserProg
  * Rename the pet
  */
 export function renamePet(newName: string, progress: UserProgress): UserProgress {
+  if (!progress.pet) return progress;
+
   return {
     ...progress,
     pet: {
@@ -610,6 +663,19 @@ export interface PatResult {
  * Pat the pet - increases happiness and gives small XP
  */
 export function patPet(progress: UserProgress): { progress: UserProgress; result: PatResult } {
+  if (!progress.pet) {
+    return {
+      progress,
+      result: {
+        success: false,
+        response: { animation: '', message: '請先選擇寵物！', emoji: '❓' },
+        happinessGained: 0,
+        xpGained: 0,
+        remainingPats: 0,
+      },
+    };
+  }
+
   const today = new Date().toISOString().split('T')[0];
 
   // Check if can pat
@@ -668,6 +734,18 @@ export function feedPetWithFood(
   foodType: 'dragon_fruit' | 'magic_berry' | 'star_candy',
   progress: UserProgress
 ): { progress: UserProgress; result: FeedResult } {
+  if (!progress.pet) {
+    return {
+      progress,
+      result: {
+        success: false,
+        message: '請先選擇寵物！',
+        happinessGained: 0,
+        xpGained: 0,
+      },
+    };
+  }
+
   // Check if has food
   const foodIndex = progress.pet.foodInventory.findIndex(f => f.type === foodType && f.quantity > 0);
 
@@ -725,6 +803,8 @@ export function addFoodReward(
   food: FoodItem,
   progress: UserProgress
 ): UserProgress {
+  if (!progress.pet) return progress;
+
   const existingIndex = progress.pet.foodInventory.findIndex(f => f.type === food.type);
 
   let newInventory: FoodItem[];
@@ -761,6 +841,8 @@ export function completeDailyTask(
   taskId: string,
   progress: UserProgress
 ): { progress: UserProgress; result: DailyTaskResult | null } {
+  if (!progress.pet) return { progress, result: null };
+
   const today = new Date().toISOString().split('T')[0];
   const task = DAILY_TASKS.find(t => t.id === taskId);
 
@@ -812,6 +894,8 @@ export function completeDailyTask(
  * Get food inventory summary
  */
 export function getFoodInventorySummary(progress: UserProgress): { type: string; nameZh: string; emoji: string; quantity: number }[] {
+  if (!progress.pet) return [];
+
   return progress.pet.foodInventory.map(food => ({
     type: food.type,
     nameZh: FOOD_TYPES[food.type].nameZh,
@@ -850,6 +934,11 @@ export {
   getXPToNextEvolution,
   isSkillOnCooldown,
   getSkillCooldownRemaining,
+  // Species exports
+  PET_SPECIES,
+  getPetStageName,
+  getPetSvgPath,
+  DEFAULT_PET_NAMES,
   // Interaction exports
   getPatResponse,
   canPatPet,
