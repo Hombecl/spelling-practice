@@ -11,7 +11,6 @@ import {
   addXP,
   feedPet,
   calculateXP,
-  PET_EMOJIS,
   EvolutionResult,
   renamePet,
   activateSkill,
@@ -95,6 +94,7 @@ import DailyQuests from '@/components/DailyQuests';
 import MnemonicHint from '@/components/MnemonicHint';
 import { SpellingTestStage, onSpellingTestAdded, getAdaptiveWords } from '@/lib/adaptiveLevel';
 import SpellingTestChallenge from '@/components/adventure/SpellingTestChallenge';
+import PetDisplay from '@/components/pet/PetDisplay';
 
 type PetScreen = 'main' | 'shop' | 'badges';
 type AdventureScreen = 'map' | 'stage' | 'boss' | 'spelling-test';
@@ -941,16 +941,10 @@ export default function Home() {
                       setTimeout(() => setPetSpeech(null), 2000);
                     }
                   }}
-                  className={`text-8xl sm:text-9xl cursor-pointer hover:scale-110 active:scale-95 transition-transform ${patAnimation || 'animate-bounce-gentle'}`}
+                  className={`cursor-pointer hover:scale-110 active:scale-95 transition-transform ${patAnimation || ''}`}
                 >
-                  {PET_EMOJIS[progress.pet.stage]}
+                  <PetDisplay pet={progress.pet} size="large" showName={false} showMood={false} />
                 </button>
-                {/* Mood indicator */}
-                <div className="absolute -top-2 -right-2 text-2xl">
-                  {progress.pet.happiness >= 70 ? '💖' :
-                   progress.pet.happiness >= 40 ? '😊' :
-                   progress.pet.happiness >= 20 ? '😐' : '😢'}
-                </div>
                 {/* Interaction feedback */}
                 {interactionMessage && (
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 animate-xp-float">
@@ -1594,9 +1588,21 @@ export default function Home() {
             <div className="text-6xl mb-4 animate-bounce">🎉</div>
             <h2 className="text-2xl font-bold text-purple-600 mb-2">進化成功！</h2>
             <div className="flex items-center justify-center gap-4 my-6">
-              <div className="text-5xl">{PET_EMOJIS[showEvolution.oldStage]}</div>
+              <PetDisplay
+                pet={{ ...progress.pet, stage: showEvolution.oldStage }}
+                size="small"
+                showName={false}
+                showMood={false}
+              />
               <div className="text-2xl text-gray-400">→</div>
-              <div className="text-6xl animate-pulse">{PET_EMOJIS[showEvolution.newStage]}</div>
+              <div className="animate-pixel-levelup">
+                <PetDisplay
+                  pet={{ ...progress.pet, stage: showEvolution.newStage }}
+                  size="medium"
+                  showName={false}
+                  showMood={false}
+                />
+              </div>
             </div>
             <p className="text-lg text-gray-600 mb-6">
               你嘅寵物進化成為
@@ -1657,8 +1663,8 @@ export default function Home() {
               幫寵物改名 ✏️
             </h2>
 
-            <div className="text-center mb-4">
-              <span className="text-6xl">{PET_EMOJIS[progress.pet.stage]}</span>
+            <div className="flex justify-center mb-4">
+              <PetDisplay pet={progress.pet} size="medium" showName={false} showMood={false} />
             </div>
 
             <input
