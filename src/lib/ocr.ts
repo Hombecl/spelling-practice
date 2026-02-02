@@ -258,20 +258,29 @@ async function tryGeminiOCR(
 }
 
 // Extract English words from an image with highlight detection
-// Tries Gemini OCR first, falls back to Tesseract.js
+// Uses AI OCR only - no Tesseract fallback to ensure highlight detection works
 export async function extractWordsFromImage(
   imageSource: File | string,
   onProgress?: (progress: number) => void,
   options?: OCRScanOptions
 ): Promise<OCRResult> {
-  // Try Gemini OCR first (better accuracy, can detect highlights)
-  const geminiResult = await tryGeminiOCR(imageSource, onProgress, options);
-  if (geminiResult) {
-    return geminiResult;
+  // Use AI OCR only (Tesseract can't detect highlights)
+  const aiResult = await tryGeminiOCR(imageSource, onProgress, options);
+  if (aiResult) {
+    return aiResult;
   }
 
-  // Fallback to Tesseract.js (local, no API key needed)
-  return extractWordsWithTesseract(imageSource, onProgress);
+  // If AI OCR fails, return error instead of falling back to Tesseract
+  // (Tesseract does raw OCR and can't understand highlights)
+  return {
+    success: false,
+    words: [],
+    highlightedWords: [],
+    rawText: '',
+    confidence: 0,
+    error: 'AI OCR 暫時唔得用，請稍後再試',
+    source: 'tesseract', // Mark as failed
+  };
 }
 
 // Original Tesseract-based OCR (kept as fallback)
