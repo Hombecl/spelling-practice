@@ -20,6 +20,17 @@ interface SpellModeProps {
 const MAX_ERRORS = 3;
 const COOLDOWN_MS = 2000;
 
+// Check if user prefers on-screen keyboard (saved in localStorage)
+function getKeyboardPreference(): boolean {
+  if (typeof window === 'undefined') return true;
+  const saved = localStorage.getItem('spellMode_useOnScreenKeyboard');
+  // Default to on-screen for touch devices
+  if (saved === null) {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  }
+  return saved === 'true';
+}
+
 export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }: SpellModeProps) {
   const [userInput, setUserInput] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -32,7 +43,24 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
   const [showPhonics, setShowPhonics] = useState(false);
   const [currentHint, setCurrentHint] = useState<{ syllable: string; syllableIndex: number } | null>(null);
   const [activeSyllable, setActiveSyllable] = useState(-1);
+  const [useOnScreenKeyboard, setUseOnScreenKeyboard] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load keyboard preference on mount
+  useEffect(() => {
+    setUseOnScreenKeyboard(getKeyboardPreference());
+  }, []);
+
+  // Toggle keyboard preference
+  const toggleKeyboard = () => {
+    const newValue = !useOnScreenKeyboard;
+    setUseOnScreenKeyboard(newValue);
+    localStorage.setItem('spellMode_useOnScreenKeyboard', String(newValue));
+    // Focus the input for native keyboard
+    if (!newValue) {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  };
 
   // Reset the current word
   const resetWord = useCallback(() => {
@@ -243,8 +271,19 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
         </div>
       )}
 
-      {/* On-screen keyboard for mobile */}
+      {/* Keyboard Toggle Button */}
       {!showReset && (
+        <button
+          onClick={toggleKeyboard}
+          className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+          aria-label={useOnScreenKeyboard ? '切換到實體鍵盤' : '切換到螢幕鍵盤'}
+        >
+          ⌨️ {useOnScreenKeyboard ? '用實體鍵盤' : '用螢幕鍵盤'}
+        </button>
+      )}
+
+      {/* On-screen keyboard for mobile (collapsible) */}
+      {!showReset && useOnScreenKeyboard && (
         <div className={`w-full max-w-sm ${isCooldown ? 'opacity-50 pointer-events-none' : ''}`}>
           <div className="grid grid-cols-10 gap-1 mb-1">
             {['q','w','e','r','t','y','u','i','o','p'].map((letter) => (
@@ -252,19 +291,21 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
                 key={letter}
                 onClick={() => handleKeyPress(letter)}
                 disabled={isCooldown}
-                className="h-11 sm:h-12 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-base sm:text-lg font-bold uppercase transition-colors"
+                aria-label={`字母 ${letter.toUpperCase()}`}
+                className="h-10 sm:h-11 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-sm sm:text-base font-bold uppercase transition-colors focus:ring-2 focus:ring-blue-400"
               >
                 {letter}
               </button>
             ))}
           </div>
-          <div className="grid grid-cols-9 gap-1 mb-1 px-3">
+          <div className="grid grid-cols-9 gap-1 mb-1 px-2">
             {['a','s','d','f','g','h','j','k','l'].map((letter) => (
               <button
                 key={letter}
                 onClick={() => handleKeyPress(letter)}
                 disabled={isCooldown}
-                className="h-11 sm:h-12 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-base sm:text-lg font-bold uppercase transition-colors"
+                aria-label={`字母 ${letter.toUpperCase()}`}
+                className="h-10 sm:h-11 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-sm sm:text-base font-bold uppercase transition-colors focus:ring-2 focus:ring-blue-400"
               >
                 {letter}
               </button>
@@ -274,21 +315,31 @@ export default function SpellMode({ word, onComplete, onSkip, hintLetters = [] }
             <button
               onClick={() => handleKeyPress('backspace')}
               disabled={isCooldown}
-              className="h-11 sm:h-12 bg-red-200 hover:bg-red-300 active:bg-red-400 rounded text-sm font-bold col-span-2 transition-colors"
+              aria-label="刪除"
+              className="h-10 sm:h-11 bg-red-200 hover:bg-red-300 active:bg-red-400 rounded text-xs font-bold col-span-2 transition-colors focus:ring-2 focus:ring-red-400"
             >
-              ⌫ 刪除
+              ⌫
             </button>
             {['z','x','c','v','b','n','m'].map((letter) => (
               <button
                 key={letter}
                 onClick={() => handleKeyPress(letter)}
                 disabled={isCooldown}
-                className="h-11 sm:h-12 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-base sm:text-lg font-bold uppercase transition-colors"
+                aria-label={`字母 ${letter.toUpperCase()}`}
+                className="h-10 sm:h-11 bg-gray-200 hover:bg-gray-300 active:bg-gray-400 rounded text-sm sm:text-base font-bold uppercase transition-colors focus:ring-2 focus:ring-blue-400"
               >
                 {letter}
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Native keyboard hint when on-screen keyboard is hidden */}
+      {!showReset && !useOnScreenKeyboard && (
+        <div className="text-center text-gray-500 text-sm p-4 bg-gray-50 rounded-lg">
+          <p>⌨️ 用鍵盤打字</p>
+          <p className="text-xs text-gray-400 mt-1">撳上面嘅框框開始打字</p>
         </div>
       )}
 
