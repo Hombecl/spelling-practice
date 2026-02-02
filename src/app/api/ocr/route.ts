@@ -3,67 +3,94 @@ import { NextRequest, NextResponse } from 'next/server';
 // OpenRouter API endpoint (OpenAI-compatible)
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Gemini 2.5 Flash - more capable vision model (~$0.25/1M input tokens)
-// Upgraded from Flash Lite for better vocabulary extraction accuracy
-const MODEL = 'google/gemini-2.5-flash-preview-05-20';
+// GPT-4o - best vision model for understanding visual context like highlighters
+// Switched from Gemini due to poor highlight detection
+const MODEL = 'openai/gpt-4o';
 
-// Color name mapping for prompts
-const COLOR_NAMES: Record<string, string> = {
-  yellow: 'YELLOW',
-  pink: 'PINK/MAGENTA',
-  green: 'GREEN',
-  blue: 'BLUE',
-  orange: 'ORANGE',
-};
+// Fallback model if GPT-4o fails
+const FALLBACK_MODEL = 'google/gemini-2.5-flash-preview-05-20';
 
 // ===========================================
-// SINGLE-STEP APPROACH: One prompt does everything
-// Gemini reads image → identifies highlights → outputs only valid vocabulary
+// GPT-4o APPROACH: Strong visual understanding
+// GPT-4o can understand "highlighted text" as a visual concept
 // ===========================================
 
 function buildPrompt(mode: string, highlightColors?: string[]): string {
-  // Build color description for Chinese prompt
-  let colorDesc = '任何顏色';
+  // Build color description
+  let colorDesc = 'any color';
+  let colorDescZh = '任何顏色';
+
   if (mode === 'highlighted' && highlightColors && highlightColors.length > 0 && highlightColors.length < 5) {
-    const colorMap: Record<string, string> = {
+    const colorMapEn: Record<string, string> = {
+      yellow: 'yellow',
+      pink: 'pink/magenta',
+      green: 'green',
+      blue: 'blue',
+      orange: 'orange',
+    };
+    const colorMapZh: Record<string, string> = {
       yellow: '黃色',
       pink: '粉紅色',
       green: '綠色',
       blue: '藍色',
       orange: '橙色',
     };
-    const colors = highlightColors.map(c => colorMap[c] || c);
-    colorDesc = colors.join('或');
+    colorDesc = highlightColors.map(c => colorMapEn[c] || c).join(' or ');
+    colorDescZh = highlightColors.map(c => colorMapZh[c] || c).join('或');
   }
 
   if (mode === 'highlighted') {
-    // Simple Chinese prompt - like what worked with Grok
-    return `這是一張香港幼稚園及小學生學習英文的教科書或工作紙照片。
+    // GPT-4o optimized prompt - more explicit about visual characteristics
+    return `You are looking at a photo of a Hong Kong primary school English textbook or worksheet.
 
-請幫我從這張照片中，將所有用${colorDesc}螢光筆highlight的英文字詞提取出來。
+TASK: Find all English words/phrases that have been HIGHLIGHTED with a ${colorDesc} highlighter pen.
 
-這些內容可能是單字（如 apple, beautiful）或詞語/句子（如 "Good morning", "Thank you"）。
+VISUAL CHARACTERISTICS OF HIGHLIGHTED TEXT:
+- Text has a semi-transparent colored background (${colorDesc})
+- The highlight color overlays the text, making it stand out
+- NOT just bold or underlined text - specifically highlighter marker
+- The highlight may be slightly uneven (hand-drawn)
 
-請逐行列出每個highlight的字詞，每行一個。只需要列出字詞本身，不需要任何解釋或編號。
+IMPORTANT:
+- ONLY extract words that are visually highlighted with highlighter pen
+- Do NOT extract regular printed text without highlighting
+- Do NOT extract text that is just bold, underlined, or in a colored box
+- Ignore headers, page numbers, publisher names (like "MING PAO")
 
-如果找不到任何highlight的字詞，請回覆：NO_WORDS_FOUND`;
+OUTPUT FORMAT:
+- List each highlighted word or phrase on a separate line
+- No numbers, bullets, or explanations
+- Just the words themselves
+- If a complete phrase is highlighted, keep it together (e.g., "Good morning")
+
+If no highlighted words are found, respond with: NO_WORDS_FOUND
+
+${colorDescZh}螢光筆標記嘅英文字`;
   }
 
   // Smart mode - AI picks vocabulary
-  return `這是一張香港幼稚園及小學生學習英文的教科書或工作紙照片。
+  return `You are looking at a photo of a Hong Kong primary school English textbook or worksheet.
 
-請幫我識別這張照片中的重要英文生字和詞語。
+TASK: Identify the key English vocabulary words that a student should learn from this page.
 
-重點找出：
-- 粗體、放大、或特別標示的字詞
-- 生字表或詞彙框內的字詞
-- 課文中的關鍵詞彙
+FOCUS ON:
+- Bold or enlarged vocabulary words
+- Words in vocabulary boxes or word lists
+- Key terms that are emphasized in any way
+- Important content words (nouns, verbs, adjectives)
 
-這些可能是單字（如 apple, beautiful）或詞語/句子（如 "Good morning", "Thank you"）。
+IGNORE:
+- Common words like "the", "is", "a", "to", "and"
+- Headers, page numbers, publisher names
+- Instructions text
 
-請逐行列出每個字詞，每行一個。只需要列出字詞本身，不需要任何解釋或編號。最多20個。
+OUTPUT FORMAT:
+- List each word or phrase on a separate line
+- No numbers, bullets, or explanations
+- Maximum 20 words
+- If a phrase is important, keep it together (e.g., "Good morning")
 
-如果找不到適合的字詞，請回覆：NO_WORDS_FOUND`;
+If no suitable vocabulary is found, respond with: NO_WORDS_FOUND`;
 }
 
 export async function POST(request: NextRequest) {
@@ -82,11 +109,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Single-step: Gemini does OCR + filtering in one go
     const prompt = buildPrompt(mode, highlightColors);
 
-    console.log('[OCR] Calling Gemini with mode:', mode);
-    const response = await fetch(OPENROUTER_API_URL, {
+    console.log('[OCR] Calling GPT-4o with mode:', mode);
+
+    // Try GPT-4o first
+    let response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -118,6 +146,45 @@ export async function POST(request: NextRequest) {
       }),
     });
 
+    let modelUsed = MODEL;
+
+    // If GPT-4o fails, try fallback
+    if (!response.ok) {
+      console.log('[OCR] GPT-4o failed, trying fallback model');
+      response = await fetch(OPENROUTER_API_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://spelling-practice.vercel.app',
+          'X-Title': 'Spelling Practice OCR',
+        },
+        body: JSON.stringify({
+          model: FALLBACK_MODEL,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: image,
+                  },
+                },
+                {
+                  type: 'text',
+                  text: prompt,
+                },
+              ],
+            },
+          ],
+          max_tokens: 1000,
+          temperature: 0,
+        }),
+      });
+      modelUsed = FALLBACK_MODEL;
+    }
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('OpenRouter API error:', response.status, errorText);
@@ -130,7 +197,7 @@ export async function POST(request: NextRequest) {
     const result = await response.json();
     const rawOutput = result.choices?.[0]?.message?.content || '';
 
-    console.log('[OCR] Gemini output:', rawOutput);
+    console.log(`[OCR] ${modelUsed} output:`, rawOutput);
 
     // Check for no words found
     if (rawOutput.includes('NO_WORDS_FOUND')) {
@@ -139,7 +206,7 @@ export async function POST(request: NextRequest) {
         words: [],
         highlightedWords: [],
         rawText: rawOutput,
-        source: 'gemini-ocr',
+        source: modelUsed === MODEL ? 'gpt4o-ocr' : 'gemini-ocr',
       });
     }
 
@@ -151,7 +218,7 @@ export async function POST(request: NextRequest) {
       words,
       highlightedWords,
       rawText: rawOutput,
-      source: 'gemini-ocr',
+      source: modelUsed === MODEL ? 'gpt4o-ocr' : 'gemini-ocr',
     });
   } catch (error) {
     console.error('OCR API error:', error);
@@ -189,7 +256,7 @@ const GARBAGE_WORDS = new Set([
   'ght', 'nge', 'ple', 'ble', 'dle', 'tle', 'gle', 'fle', 'sle',
 ]);
 
-// Parse output from Gemini - handles both single words and full phrases/sentences
+// Parse output - handles both single words and full phrases/sentences
 function parseSimpleOutput(text: string, mode: string): { words: string[]; highlightedWords: string[] } {
   const words: string[] = [];
   const seen = new Set<string>();
@@ -204,10 +271,15 @@ function parseSimpleOutput(text: string, mode: string): { words: string[]; highl
     // Skip obvious non-content lines
     if (phrase.toLowerCase().includes('no_words') || phrase.toLowerCase().includes('no words')) continue;
     if (phrase.toLowerCase().includes('找不到') || phrase.toLowerCase().includes('沒有')) continue;
+    if (phrase.toLowerCase().includes('not found') || phrase.toLowerCase().includes('no highlighted')) continue;
 
     // Skip section headers (e.g., "From Section 3:", "Highlighted Words:")
-    if (/^(from|section|highlighted|additional|song|lyrics)[\s\w]*:/i.test(phrase)) continue;
+    if (/^(from|section|highlighted|additional|song|lyrics|note|output)[\s\w]*:/i.test(phrase)) continue;
     if (phrase.startsWith('#')) continue;
+
+    // Skip explanatory text
+    if (phrase.toLowerCase().startsWith('the image') || phrase.toLowerCase().startsWith('i can see')) continue;
+    if (phrase.toLowerCase().startsWith('there are') || phrase.toLowerCase().startsWith('these are')) continue;
 
     // Remove bullet points and numbering prefixes
     phrase = phrase.replace(/^[\-\•\*]+\s*/, '');
