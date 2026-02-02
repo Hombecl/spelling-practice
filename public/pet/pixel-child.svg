@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" shape-rendering="crispEdges">
+  <!-- Pixel Child Dragon - Stage 3 -->
+  <!-- Growing up: proper wings starting, tail longer, still cute -->
+
+  <!-- Shadow -->
+  <rect x="6" y="22" width="12" height="1" fill="#c4b5fd" opacity="0.5"/>
+
+  <!-- Tail (longer with spike) -->
+  <rect x="18" y="16" width="2" height="1" fill="#a78bfa"/>
+  <rect x="19" y="17" width="2" height="1" fill="#a78bfa"/>
+  <rect x="20" y="18" width="2" height="1" fill="#8b5cf6"/>
+  <rect x="21" y="19" width="1" height="1" fill="#7c3aed"/>
+  <!-- Tail spike -->
+  <rect x="22" y="17" width="1" height="1" fill="#6d28d9"/>
+
+  <!-- Body -->
+  <rect x="9" y="14" width="8" height="5" fill="#c4b5fd"/>
+  <rect x="8" y="15" width="1" height="3" fill="#c4b5fd"/>
+  <rect x="17" y="15" width="1" height="3" fill="#c4b5fd"/>
+
+  <!-- Belly -->
+  <rect x="10" y="15" width="6" height="3" fill="#fef3c7"/>
+
+  <!-- Wings (small but visible) -->
+  <rect x="4" y="12" width="4" height="4" fill="#ddd6fe"/>
+  <rect x="3" y="13" width="1" height="2" fill="#e9d5ff"/>
+  <rect x="18" y="12" width="4" height="4" fill="#ddd6fe"/>
+  <rect x="22" y="13" width="1" height="2" fill="#e9d5ff"/>
+  <!-- Wing details -->
+  <rect x="5" y="13" width="1" height="1" fill="#c4b5fd"/>
+  <rect x="19" y="13" width="1" height="1" fill="#c4b5fd"/>
+
+  <!-- Feet -->
+  <rect x="8" y="19" width="3" height="2" fill="#a78bfa"/>
+  <rect x="14" y="19" width="3" height="2" fill="#a78bfa"/>
+  <!-- Toes -->
+  <rect x="7" y="21" width="1" height="1" fill="#8b5cf6"/>
+  <rect x="9" y="21" width="1" height="1" fill="#8b5cf6"/>
+  <rect x="15" y="21" width="1" height="1" fill="#8b5cf6"/>
+  <rect x="17" y="21" width="1" height="1" fill="#8b5cf6"/>
+
+  <!-- Head -->
+  <rect x="7" y="4" width="10" height="8" fill="#c4b5fd"/>
+  <rect x="8" y="3" width="8" height="1" fill="#c4b5fd"/>
+  <rect x="8" y="12" width="8" height="1" fill="#c4b5fd"/>
+
+  <!-- Small horns -->
+  <rect x="6" y="2" width="2" height="3" fill="#8b5cf6"/>
+  <rect x="5" y="3" width="1" height="1" fill="#a78bfa"/>
+  <rect x="16" y="2" width="2" height="3" fill="#8b5cf6"/>
+  <rect x="18" y="3" width="1" height="1" fill="#a78bfa"/>
+
+  <!-- Eyes -->
+  <rect x="8" y="6" width="3" height="3" fill="#ffffff"/>
+  <rect x="13" y="6" width="3" height="3" fill="#ffffff"/>
+
+  <!-- Pupils -->
+  <rect x="9" y="7" width="2" height="2" fill="#1e1b4b"/>
+  <rect x="14" y="7" width="2" height="2" fill="#1e1b4b"/>
+
+  <!-- Eye shine -->
+  <rect x="10" y="7" width="1" height="1" fill="#ffffff"/>
+  <rect x="15" y="7" width="1" height="1" fill="#ffffff"/>
+
+  <!-- Blush -->
+  <rect x="6" y="9" width="2" height="1" fill="#fda4af"/>
+  <rect x="16" y="9" width="2" height="1" fill="#fda4af"/>
+
+  <!-- Snout -->
+  <rect x="10" y="9" width="4" height="2" fill="#a78bfa"/>
+
+  <!-- Nostrils -->
+  <rect x="10" y="10" width="1" height="1" fill="#7c3aed"/>
+  <rect x="13" y="10" width="1" height="1" fill="#7c3aed"/>
+
+  <!-- Smile -->
+  <rect x="11" y="11" width="2" height="1" fill="#7c3aed"/>
+
+  <!-- Sparkles -->
+  <rect x="2" y="5" width="1" height="1" fill="#fcd34d"/>
+  <rect x="21" y="7" width="1" height="1" fill="#fcd34d"/>
+</svg>

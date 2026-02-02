@@ -6,7 +6,11 @@ import {
   getCustomWordLists,
   createWordList,
   deleteWordList,
+  setSpellingTestMode,
+  getDaysUntilDeadline,
+  getSpellingTestStats,
 } from '@/lib/customWords';
+import { onSpellingTestAdded } from '@/lib/adaptiveLevel';
 import OCRScanner from '@/components/OCRScanner';
 
 interface WordListManagerProps {
@@ -26,6 +30,9 @@ export default function WordListManager({
   const [newName, setNewName] = useState('');
   const [newWords, setNewWords] = useState('');
   const [error, setError] = useState('');
+  const [editingListId, setEditingListId] = useState<string | null>(null);
+  const [isSpellingTest, setIsSpellingTest] = useState(false);
+  const [deadline, setDeadline] = useState('');
 
   useEffect(() => {
     setLists(getCustomWordLists());
@@ -48,6 +55,10 @@ export default function WordListManager({
     }
 
     const list = createWordList(newName, newWords);
+
+    // Update adaptive level based on new spelling test words
+    onSpellingTestAdded(list);
+
     setLists(getCustomWordLists());
     setNewName('');
     setNewWords('');
@@ -74,6 +85,33 @@ export default function WordListManager({
     setNewWords(existingWords ? `${existingWords}, ${newWordsText}` : newWordsText);
     setShowOCR(false);
     setShowCreate(true);
+  };
+
+  const handleEditSettings = (list: CustomWordList, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingListId(list.id);
+    setIsSpellingTest(list.isSpellingTest || false);
+    setDeadline(list.deadline || '');
+  };
+
+  const handleSaveSettings = () => {
+    if (editingListId) {
+      setSpellingTestMode(editingListId, isSpellingTest, isSpellingTest ? deadline : undefined);
+      setLists(getCustomWordLists());
+      setEditingListId(null);
+      setIsSpellingTest(false);
+      setDeadline('');
+    }
+  };
+
+  const formatDeadline = (list: CustomWordList) => {
+    const days = getDaysUntilDeadline(list);
+    if (days === null) return null;
+    if (days < 0) return { text: '已過期', color: 'text-gray-400' };
+    if (days === 0) return { text: '今日默書！', color: 'text-red-600 font-bold' };
+    if (days === 1) return { text: '聽日默書', color: 'text-orange-600 font-bold' };
+    if (days <= 3) return { text: `仲有 ${days} 日`, color: 'text-orange-500' };
+    return { text: `${days} 日後`, color: 'text-gray-500' };
   };
 
   return (
@@ -104,40 +142,169 @@ export default function WordListManager({
       </button>
 
       {/* Custom lists */}
-      {lists.map((list) => (
-        <button
-          key={list.id}
-          onClick={() => onSelectList(list)}
-          className={`
-            w-full p-4 mb-3 rounded-xl border-2 text-left transition-all
-            ${
-              selectedListId === list.id
-                ? 'bg-green-50 border-green-400'
-                : 'bg-white border-gray-200 hover:border-green-300'
-            }
-          `}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">📋</span>
-              <div>
-                <div className="font-bold text-gray-800">{list.name}</div>
-                <div className="text-sm text-gray-500">
-                  {list.words.length} 個字 · {list.words.slice(0, 5).join(', ')}
-                  {list.words.length > 5 ? '...' : ''}
+      {lists.map((list) => {
+        const deadlineInfo = formatDeadline(list);
+        const stats = list.isSpellingTest ? getSpellingTestStats(list.id) : null;
+
+        return (
+          <div key={list.id} className="mb-3">
+            <button
+              onClick={() => onSelectList(list)}
+              className={`
+                w-full p-4 rounded-xl border-2 text-left transition-all
+                ${
+                  selectedListId === list.id
+                    ? 'bg-green-50 border-green-400'
+                    : 'bg-white border-gray-200 hover:border-green-300'
+                }
+              `}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className="text-2xl">{list.isSpellingTest ? '📝' : '📋'}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-800 truncate">{list.name}</span>
+                      {list.isSpellingTest && (
+                        <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          默書
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {list.words.length} 個字
+                      {stats && stats.mastered > 0 && (
+                        <span className="ml-2 text-green-600">
+                          ✓ {stats.mastered}/{stats.total} 已掌握
+                        </span>
+                      )}
+                    </div>
+                    {deadlineInfo && (
+                      <div className={`text-xs mt-1 ${deadlineInfo.color}`}>
+                        📅 {deadlineInfo.text}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    onClick={(e) => handleEditSettings(list, e)}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                    aria-label="Settings"
+                  >
+                    ⚙️
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(list.id, e)}
+                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    aria-label="Delete list"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
-            </div>
-            <button
-              onClick={(e) => handleDelete(list.id, e)}
-              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
-              aria-label="Delete list"
-            >
-              🗑️
             </button>
+
+            {/* Settings modal for this list */}
+            {editingListId === list.id && (
+              <div className="mt-2 p-4 bg-blue-50 rounded-xl border-2 border-blue-200">
+                <h4 className="font-bold text-gray-700 mb-3">📋 {list.name} 設定</h4>
+
+                {/* Spelling test toggle */}
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="font-medium text-gray-700">默書模式</div>
+                    <div className="text-xs text-gray-500">追蹤每個字嘅熟練度</div>
+                  </div>
+                  <button
+                    onClick={() => setIsSpellingTest(!isSpellingTest)}
+                    className={`
+                      w-12 h-6 rounded-full transition-colors relative
+                      ${isSpellingTest ? 'bg-green-500' : 'bg-gray-300'}
+                    `}
+                  >
+                    <div
+                      className={`
+                        w-5 h-5 bg-white rounded-full absolute top-0.5 transition-transform shadow
+                        ${isSpellingTest ? 'translate-x-6' : 'translate-x-0.5'}
+                      `}
+                    />
+                  </button>
+                </div>
+
+                {/* Deadline picker */}
+                {isSpellingTest && (
+                  <div className="mb-3">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">
+                      📅 默書日期
+                    </label>
+                    <input
+                      type="date"
+                      value={deadline}
+                      onChange={(e) => setDeadline(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="w-full p-2 rounded-lg border-2 border-gray-200 focus:border-blue-400 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {/* Mastery stats */}
+                {isSpellingTest && stats && (
+                  <div className="mb-3 p-3 bg-white rounded-lg">
+                    <div className="text-sm font-medium text-gray-600 mb-2">熟練度</div>
+                    <div className="flex gap-2 text-xs">
+                      <div className="flex-1 text-center p-2 bg-green-50 rounded">
+                        <div className="font-bold text-green-600">{stats.mastered}</div>
+                        <div className="text-green-500">已掌握</div>
+                      </div>
+                      <div className="flex-1 text-center p-2 bg-yellow-50 rounded">
+                        <div className="font-bold text-yellow-600">{stats.learning}</div>
+                        <div className="text-yellow-500">學緊</div>
+                      </div>
+                      <div className="flex-1 text-center p-2 bg-gray-50 rounded">
+                        <div className="font-bold text-gray-600">{stats.newWords}</div>
+                        <div className="text-gray-500">未練</div>
+                      </div>
+                      {stats.forgotten > 0 && (
+                        <div className="flex-1 text-center p-2 bg-red-50 rounded">
+                          <div className="font-bold text-red-600">{stats.forgotten}</div>
+                          <div className="text-red-500">要溫</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all"
+                        style={{ width: `${stats.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setEditingListId(null);
+                      setIsSpellingTest(false);
+                      setDeadline('');
+                    }}
+                    className="flex-1 p-2 rounded-lg border-2 border-gray-300 text-gray-600 hover:bg-gray-100"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleSaveSettings}
+                    className="flex-1 p-2 rounded-lg bg-blue-500 text-white font-bold hover:bg-blue-600"
+                  >
+                    儲存
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </button>
-      ))}
+        );
+      })}
 
       {/* Create new list */}
       {!showCreate ? (

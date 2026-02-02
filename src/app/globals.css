@@ -221,6 +221,147 @@ body {
   animation: pulse-slow 3s ease-in-out infinite;
 }
 
+/* ========== Pixel Art Pet Animations ========== */
+/* These use step() timing for crisp pixel-perfect movement */
+
+/* Pixel art rendering - keeps edges crisp */
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: none;
+}
+
+/* Pixel idle bounce - step-based for retro feel */
+@keyframes pixel-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* Pixel wobble for egg */
+@keyframes pixel-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+/* Pixel happy bounce */
+@keyframes pixel-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  25% { transform: translateY(-6px) scale(1.02); }
+  50% { transform: translateY(-8px) scale(1.05); }
+  75% { transform: translateY(-6px) scale(1.02); }
+}
+
+/* Pixel glow pulse for adult dragon */
+@keyframes pixel-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(139, 92, 246, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.8));
+  }
+}
+
+/* Pixel fire flicker for adult dragon */
+@keyframes pixel-fire {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.6));
+  }
+  33% {
+    filter: drop-shadow(0 0 8px rgba(251, 191, 36, 0.8));
+  }
+  66% {
+    filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.7));
+  }
+}
+
+/* Pixel sleepy droop */
+@keyframes pixel-sleepy {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+  50% { transform: translateY(2px) rotate(-2deg); opacity: 0.5; }
+}
+
+/* Pixel hungry shake */
+@keyframes pixel-hungry {
+  0%, 100% { transform: translateX(0); opacity: 0.7; }
+  25% { transform: translateX(-2px); opacity: 0.7; }
+  75% { transform: translateX(2px); opacity: 0.7; }
+}
+
+/* Evolution sparkle effect */
+@keyframes pixel-sparkle {
+  0% { opacity: 0; transform: scale(0.5) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1.2) rotate(180deg); }
+  100% { opacity: 0; transform: scale(0.5) rotate(360deg); }
+}
+
+/* Level up flash */
+@keyframes pixel-levelup {
+  0% { filter: brightness(1); }
+  25% { filter: brightness(2); }
+  50% { filter: brightness(1); }
+  75% { filter: brightness(1.5); }
+  100% { filter: brightness(1); }
+}
+
+/* Pixel art animation classes - use steps for retro feel */
+.animate-pixel-idle {
+  animation: pixel-idle 1.5s steps(4) infinite;
+}
+
+.animate-pixel-wobble {
+  animation: pixel-wobble 2s steps(6) infinite;
+}
+
+.animate-pixel-bounce {
+  animation: pixel-bounce 1s steps(8) infinite;
+}
+
+.animate-pixel-glow {
+  animation: pixel-glow 2s ease-in-out infinite;
+}
+
+.animate-pixel-fire {
+  animation: pixel-fire 0.5s steps(3) infinite;
+}
+
+.animate-pixel-sleepy {
+  animation: pixel-sleepy 2s steps(4) infinite;
+}
+
+.animate-pixel-hungry {
+  animation: pixel-hungry 0.5s steps(4) infinite;
+}
+
+.animate-pixel-sparkle {
+  animation: pixel-sparkle 1s steps(8) infinite;
+}
+
+.animate-pixel-levelup {
+  animation: pixel-levelup 0.5s steps(5) forwards;
+}
+
+/* Combined animations for each pet stage */
+.pet-egg {
+  animation: pixel-wobble 2s steps(6) infinite;
+}
+
+.pet-baby {
+  animation: pixel-bounce 1.2s steps(8) infinite;
+}
+
+.pet-child {
+  animation: pixel-idle 1.5s steps(4) infinite;
+}
+
+.pet-teen {
+  animation: pixel-idle 1.2s steps(4) infinite, pixel-glow 3s ease-in-out infinite;
+}
+
+.pet-adult {
+  animation: pixel-idle 1s steps(4) infinite, pixel-fire 0.5s steps(3) infinite;
+}
+
 /* Larger touch targets for children - mobile optimized */
 button {
   min-height: 44px;

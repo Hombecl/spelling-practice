@@ -44,7 +44,16 @@ import {
   addItemToInventory,
 } from '@/lib/progress';
 import { Word } from '@/lib/words';
-import { CustomWordList, markWordListUsed } from '@/lib/customWords';
+import {
+  CustomWordList,
+  markWordListUsed,
+  getSmartPracticeWords,
+  updateWordMastery,
+  getWordListById,
+  getCustomWordLists,
+  getSpellingTestStats,
+  getDaysUntilDeadline,
+} from '@/lib/customWords';
 import {
   getCurrentSession,
   logout,
@@ -61,8 +70,34 @@ import ModeSelector from '@/components/ModeSelector';
 import WordListManager from '@/components/WordListManager';
 import BadgeDisplay from '@/components/BadgeDisplay';
 import ProgressBar from '@/components/ProgressBar';
+import BottomTabBar, { Tab } from '@/components/BottomTabBar';
+import { AdventureMap, StagePlay, BossBattle } from '@/components/adventure';
+import {
+  WorldId,
+  WORLDS,
+  getWorldById,
+  getStageById,
+  createDefaultAdventureProgress,
+  updateWorldUnlocks,
+  completeStage,
+  completeBoss,
+} from '@/lib/adventure';
+import {
+  getDailyEngagement,
+  recordPractice,
+  recordWordCompletion,
+  recordAdventureStage,
+  DailyEngagement,
+  STREAK_MILESTONES,
+} from '@/lib/dailySystem';
+import DailyStreak from '@/components/DailyStreak';
+import DailyQuests from '@/components/DailyQuests';
+import MnemonicHint from '@/components/MnemonicHint';
+import { SpellingTestStage, onSpellingTestAdded, getAdaptiveWords } from '@/lib/adaptiveLevel';
+import SpellingTestChallenge from '@/components/adventure/SpellingTestChallenge';
 
-type Screen = 'login' | 'home' | 'play' | 'badges' | 'wordlists' | 'pet' | 'shop';
+type PetScreen = 'main' | 'shop' | 'badges';
+type AdventureScreen = 'map' | 'stage' | 'boss' | 'spelling-test';
 
 // Built-in words for different levels
 const builtInWords = {
@@ -74,9 +109,13 @@ const builtInWords = {
 export default function Home() {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [currentWord, setCurrentWord] = useState<Word | null>(null);
-  const [screen, setScreen] = useState<Screen>('login');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isGuest, setIsGuest] = useState(false);
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<Tab>('play');
+  const [isPracticing, setIsPracticing] = useState(false);
+  const [petScreen, setPetScreen] = useState<PetScreen>('main');
   const [wordsCompleted, setWordsCompleted] = useState(0);
   const [sessionTarget, setSessionTarget] = useState(10);
   const [customList, setCustomList] = useState<CustomWordList | null>(null);
@@ -95,6 +134,15 @@ export default function Home() {
   const [showFoodReward, setShowFoodReward] = useState<{ type: string; emoji: string } | null>(null);
   const [showItemDrop, setShowItemDrop] = useState<{ nameZh: string; emoji: string } | null>(null);
   const [itemUseMessage, setItemUseMessage] = useState<string | null>(null);
+  // Adventure mode states
+  const [adventureScreen, setAdventureScreen] = useState<AdventureScreen>('map');
+  const [currentWorldId, setCurrentWorldId] = useState<WorldId | null>(null);
+  const [currentStageNum, setCurrentStageNum] = useState<number | null>(null);
+  const [currentSpellingTestStage, setCurrentSpellingTestStage] = useState<SpellingTestStage | null>(null);
+  // Daily engagement states
+  const [dailyEngagement, setDailyEngagement] = useState<DailyEngagement | null>(null);
+  const [showMilestone, setShowMilestone] = useState<typeof STREAK_MILESTONES[0] | null>(null);
+  const [showMnemonicHint, setShowMnemonicHint] = useState(false);
 
   // Helper: Save progress locally and to cloud if logged in
   const saveProgressWithSync = useCallback((newProgress: UserProgress) => {
@@ -124,7 +172,7 @@ export default function Home() {
       saveProgressToCloud(user.id, updatedP);
     }
 
-    setScreen('home');
+    setIsLoggedIn(true);
   };
 
   const handleSkipLogin = () => {
@@ -133,14 +181,14 @@ export default function Home() {
     const updatedP = updateStreak(p);
     setProgress(updatedP);
     saveProgress(updatedP);
-    setScreen('home');
+    setIsLoggedIn(true);
   };
 
   const handleLogout = () => {
     logout();
     setCurrentUser(null);
     setIsGuest(false);
-    setScreen('login');
+    setIsLoggedIn(false);
   };
 
   // Check for existing session and load progress on mount
@@ -166,7 +214,7 @@ export default function Home() {
           setProgress(updatedP);
           saveProgress(updatedP);
         }
-        setScreen('home');
+        setIsLoggedIn(true);
       } else if (!isSupabaseConfigured()) {
         // No Supabase configured, go directly to guest mode
         setIsGuest(true);
@@ -174,18 +222,29 @@ export default function Home() {
         const updatedP = updateStreak(p);
         setProgress(updatedP);
         saveProgress(updatedP);
-        setScreen('home');
+        setIsLoggedIn(true);
       }
       // Otherwise stay on login screen
+
+      // Initialize daily engagement
+      setDailyEngagement(getDailyEngagement());
     };
 
     initApp();
   }, []);
 
+  // Get the active word list based on progress.activeWordListId
+  const getActiveWordList = useCallback((): CustomWordList | null => {
+    if (!progress?.activeWordListId) return null;
+    const lists = getCustomWordLists();
+    return lists.find(l => l.id === progress.activeWordListId) || null;
+  }, [progress?.activeWordListId]);
+
   // Get words based on selection
   const getWordsForPractice = useCallback((): string[] => {
-    if (customList) {
-      return [...customList.words];
+    const activeList = getActiveWordList();
+    if (activeList) {
+      return [...activeList.words];
     }
     // Use built-in words based on mode difficulty
     if (!progress) return builtInWords.simple;
@@ -200,7 +259,7 @@ export default function Home() {
       default:
         return builtInWords.simple;
     }
-  }, [customList, progress]);
+  }, [getActiveWordList, progress]);
 
   // Shuffle array
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -214,16 +273,32 @@ export default function Home() {
 
   // Start playing
   const startPlaying = () => {
-    const words = shuffleArray(getWordsForPractice());
+    const activeList = getActiveWordList();
+    let words: string[];
+
+    // Use smart word selection for spelling tests (prioritizes words that need practice)
+    if (activeList?.isSpellingTest) {
+      words = getSmartPracticeWords(activeList.id, 10);
+    } else {
+      words = shuffleArray(getWordsForPractice());
+    }
+
     setPracticeWords(words);
     setWordIndex(0);
     setWordsCompleted(0);
     setSessionTarget(Math.min(words.length, 10));
     setCurrentWord({ word: words[0], category: 'custom' });
-    setScreen('play');
+    setIsPracticing(true);
 
-    if (customList) {
-      markWordListUsed(customList.id);
+    if (activeList) {
+      markWordListUsed(activeList.id);
+    }
+
+    // Record practice for daily streak
+    const { engagement, streakIncreased, milestone } = recordPractice();
+    setDailyEngagement(engagement);
+    if (milestone) {
+      setShowMilestone(milestone);
     }
   };
 
@@ -235,13 +310,19 @@ export default function Home() {
       setWordIndex(nextIndex);
       setCurrentWord({ word: practiceWords[nextIndex], category: 'custom' });
     } else {
-      setScreen('home');
+      setIsPracticing(false);
     }
   }, [wordIndex, practiceWords, wordsCompleted, sessionTarget]);
 
   // Handle word completion
   const handleWordComplete = (correct: boolean, attempts: number) => {
     if (!progress || !currentWord) return;
+
+    // Track mastery for spelling tests
+    const activeList = getActiveWordList();
+    if (activeList?.isSpellingTest) {
+      updateWordMastery(activeList.id, currentWord.word, correct);
+    }
 
     let newProgress = updateWordProgress(currentWord.word, correct, progress);
 
@@ -302,6 +383,10 @@ export default function Home() {
     saveProgressWithSync(newProgress);
     setWordsCompleted((prev) => prev + 1);
 
+    // Update daily quests
+    const updatedEngagement = recordWordCompletion(correct, attempts, newProgress.currentMode);
+    setDailyEngagement(updatedEngagement);
+
     setTimeout(() => {
       getNextWord();
     }, 500);
@@ -309,6 +394,11 @@ export default function Home() {
 
   // Handle skip
   const handleSkip = () => {
+    // Track skip as wrong for spelling tests
+    const activeList = getActiveWordList();
+    if (activeList?.isSpellingTest && currentWord) {
+      updateWordMastery(activeList.id, currentWord.word, false);
+    }
     getNextWord();
   };
 
@@ -320,14 +410,12 @@ export default function Home() {
     saveProgressWithSync(newProgress);
   };
 
-  // Handle custom list selection
-  const handleSelectList = (list: CustomWordList) => {
-    setCustomList(list);
-  };
-
-  // Handle built-in selection
-  const handleUseBuiltIn = () => {
-    setCustomList(null);
+  // Handle active list selection (save to progress)
+  const handleSetActiveList = (listId: string | null) => {
+    if (!progress) return;
+    const newProgress = { ...progress, activeWordListId: listId || undefined };
+    setProgress(newProgress);
+    saveProgressWithSync(newProgress);
   };
 
   // Handle using peek skill
@@ -374,8 +462,140 @@ export default function Home() {
     setHintLetters([]);
   }, []);
 
+  // ============ Adventure Mode Handlers ============
+
+  const handleAdventureStageSelect = (worldId: WorldId, stageNumber: number) => {
+    setCurrentWorldId(worldId);
+    setCurrentStageNum(stageNumber);
+    setAdventureScreen('stage');
+  };
+
+  const handleAdventureBossSelect = (worldId: WorldId) => {
+    setCurrentWorldId(worldId);
+    setAdventureScreen('boss');
+  };
+
+  const handleAdventureStageComplete = (stars: number, xpEarned: number) => {
+    if (!progress || !currentWorldId || !currentStageNum) return;
+
+    // Update adventure progress
+    const adventureProgress = progress.adventureProgress || createDefaultAdventureProgress();
+    const updatedAdventure = completeStage(adventureProgress, currentWorldId, currentStageNum, stars);
+
+    // Update world unlocks based on pet level
+    const withUnlocks = updateWorldUnlocks(updatedAdventure, progress.pet);
+
+    // Add rewards
+    let newProgress = addStars(stars + (getStageById(currentWorldId, currentStageNum)?.rewards.stars || 0), progress);
+    const { progress: xpProgress, evolution } = addXP(xpEarned, newProgress);
+    newProgress = {
+      ...xpProgress,
+      adventureProgress: withUnlocks,
+    };
+
+    setProgress(newProgress);
+    saveProgressWithSync(newProgress);
+
+    // Show XP animation
+    setXpGained(xpEarned);
+    setTimeout(() => setXpGained(null), 1500);
+
+    // Check for evolution
+    if (evolution?.evolved) {
+      setShowEvolution(evolution);
+    }
+
+    // Update daily quest for adventure
+    const updatedEngagement = recordAdventureStage();
+    setDailyEngagement(updatedEngagement);
+
+    // Return to map
+    setAdventureScreen('map');
+    setCurrentWorldId(null);
+    setCurrentStageNum(null);
+  };
+
+  const handleAdventureBossVictory = (time: number) => {
+    if (!progress || !currentWorldId) return;
+
+    const world = getWorldById(currentWorldId);
+    if (!world) return;
+
+    // Update adventure progress
+    const adventureProgress = progress.adventureProgress || createDefaultAdventureProgress();
+    const updatedAdventure = completeBoss(adventureProgress, currentWorldId, time);
+
+    // Update world unlocks
+    const withUnlocks = updateWorldUnlocks(updatedAdventure, progress.pet);
+
+    // Add boss rewards
+    let newProgress = addStars(world.boss.rewards.stars, progress);
+    const { progress: xpProgress, evolution } = addXP(world.boss.rewards.xp, newProgress);
+    newProgress = {
+      ...xpProgress,
+      adventureProgress: withUnlocks,
+    };
+
+    setProgress(newProgress);
+    saveProgressWithSync(newProgress);
+
+    // Show XP animation
+    setXpGained(world.boss.rewards.xp);
+    setTimeout(() => setXpGained(null), 1500);
+
+    // Check for evolution
+    if (evolution?.evolved) {
+      setShowEvolution(evolution);
+    }
+
+    // Return to map
+    setAdventureScreen('map');
+    setCurrentWorldId(null);
+  };
+
+  const handleSpellingTestSelect = (stage: SpellingTestStage) => {
+    setCurrentSpellingTestStage(stage);
+    setAdventureScreen('spelling-test');
+  };
+
+  const handleSpellingTestComplete = (stars: number, xp: number, allCorrect: boolean) => {
+    if (!progress) return;
+
+    // Add rewards
+    let newProgress = addStars(stars, progress);
+    const { progress: xpProgress, evolution } = addXP(xp, newProgress);
+    newProgress = xpProgress;
+
+    setProgress(newProgress);
+    saveProgressWithSync(newProgress);
+
+    // Show XP animation
+    setXpGained(xp);
+    setTimeout(() => setXpGained(null), 1500);
+
+    // Check for evolution
+    if (evolution?.evolved) {
+      setShowEvolution(evolution);
+    }
+
+    // Update daily quest for adventure
+    const updatedEngagement = recordAdventureStage();
+    setDailyEngagement(updatedEngagement);
+
+    // Return to map
+    setAdventureScreen('map');
+    setCurrentSpellingTestStage(null);
+  };
+
+  const handleAdventureExit = () => {
+    setAdventureScreen('map');
+    setCurrentWorldId(null);
+    setCurrentStageNum(null);
+    setCurrentSpellingTestStage(null);
+  };
+
   // Show login screen
-  if (screen === 'login') {
+  if (!isLoggedIn) {
     return <LoginScreen onLogin={handleLogin} onSkip={handleSkipLogin} />;
   }
 
@@ -387,17 +607,17 @@ export default function Home() {
     );
   }
 
+  // Get active word list for display
+  const activeWordList = getActiveWordList();
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 pb-safe">
-      {/* Header - Mobile optimized */}
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 pb-20">
+      {/* Header - Simplified */}
       <header className="bg-white shadow-md sticky top-0 z-40 safe-top">
         <div className="max-w-4xl mx-auto px-3 py-2 sm:px-4 sm:py-3 flex items-center justify-between">
-          <button
-            onClick={() => setScreen('home')}
-            className="text-lg sm:text-2xl font-bold text-blue-600 hover:text-blue-700 active:scale-95"
-          >
+          <div className="text-lg sm:text-2xl font-bold text-blue-600">
             🔤 串字練習
-          </button>
+          </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
             <div className="flex items-center gap-1 sm:gap-2 bg-yellow-100 px-2 sm:px-3 py-1 rounded-full">
@@ -412,25 +632,6 @@ export default function Home() {
               </div>
             )}
 
-            <button
-              onClick={() => setScreen('pet')}
-              className="text-xl sm:text-2xl hover:scale-110 active:scale-95 transition-transform p-1 relative"
-              aria-label="View pet"
-            >
-              {PET_EMOJIS[progress.pet.stage]}
-              <span className="absolute -bottom-1 -right-1 text-xs bg-purple-500 text-white rounded-full px-1 min-w-[1.25rem] text-center">
-                {progress.pet.level}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setScreen('badges')}
-              className="text-xl sm:text-2xl hover:scale-110 active:scale-95 transition-transform p-1"
-              aria-label="View badges"
-            >
-              🏅
-            </button>
-
             {/* User/Login button */}
             {currentUser ? (
               <button
@@ -442,7 +643,7 @@ export default function Home() {
               </button>
             ) : isGuest ? (
               <button
-                onClick={() => setScreen('login')}
+                onClick={() => setIsLoggedIn(false)}
                 className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-full text-gray-600 transition-colors"
               >
                 登入
@@ -454,39 +655,108 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4">
-        {screen === 'home' && (
+        {/* PLAY TAB */}
+        {activeTab === 'play' && !isPracticing && (
           <div className="flex flex-col items-center gap-6 py-4 sm:py-8">
-            {/* Welcome Message */}
-            <div className="text-center">
-              <h1 className="text-2xl sm:text-4xl font-bold text-gray-800 mb-2">
-                歡迎返嚟！ 👋
+            {/* Header with Streak */}
+            <div className="w-full max-w-lg flex items-center justify-between">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                🔤 串字練習
               </h1>
-              <p className="text-lg sm:text-xl text-gray-600">
-                準備好練習串字未？
-              </p>
+              <DailyStreak />
             </div>
 
-            {/* Word List Manager */}
-            <WordListManager
-              onSelectList={handleSelectList}
-              onUseBuiltIn={handleUseBuiltIn}
-              selectedListId={customList?.id}
-            />
+            {/* Daily Quests */}
+            <div className="w-full max-w-lg">
+              <DailyQuests
+                onXPEarned={(xp) => {
+                  if (progress) {
+                    const { progress: xpProgress, evolution } = addXP(xp, progress);
+                    setProgress(xpProgress);
+                    saveProgressWithSync(xpProgress);
+                    setXpGained(xp);
+                    setTimeout(() => setXpGained(null), 1500);
+                    if (evolution?.evolved) {
+                      setShowEvolution(evolution);
+                    }
+                  }
+                }}
+              />
+            </div>
 
-            {/* Mode Selector */}
-            <ModeSelector
-              currentMode={progress.currentMode}
-              onSelectMode={handleSelectMode}
-            />
+            {/* Spelling Test Progress (if active list is a spelling test) */}
+            {activeWordList && (() => {
+              const stats = getSpellingTestStats(activeWordList.id);
+              const daysLeft = getDaysUntilDeadline(activeWordList);
 
-            {/* Selected list info */}
-            {customList && (
-              <div className="w-full max-w-lg bg-green-50 border-2 border-green-300 rounded-xl p-4 text-center">
-                <div className="font-bold text-green-700">
-                  📋 {customList.name}
+              return (
+                <div className="w-full max-w-lg">
+                  {/* Deadline Banner */}
+                  {daysLeft !== null && (
+                    <div className={`
+                      mb-3 px-4 py-2 rounded-xl text-center font-bold
+                      ${daysLeft <= 1 ? 'bg-red-100 text-red-700' :
+                        daysLeft <= 3 ? 'bg-orange-100 text-orange-700' :
+                        'bg-blue-100 text-blue-700'}
+                    `}>
+                      {daysLeft <= 0 ? '📝 今日默書！加油！' :
+                       daysLeft === 1 ? '⏰ 聽日就默書喇！' :
+                       `📅 距離默書仲有 ${daysLeft} 日`}
+                    </div>
+                  )}
+
+                  {/* Progress Card */}
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-4">
+                    <div className="font-bold text-purple-700 text-lg mb-2">
+                      📋 {activeWordList.name}
+                    </div>
+
+                    {/* Mastery Progress Bar */}
+                    <div className="mb-3">
+                      <div className="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>掌握進度</span>
+                        <span className="font-bold">{stats.percentage}%</span>
+                      </div>
+                      <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-500"
+                          style={{ width: `${stats.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-4 gap-2 text-center text-sm">
+                      <div className="bg-white/70 rounded-lg p-2">
+                        <div className="text-lg font-bold text-green-600">{stats.mastered}</div>
+                        <div className="text-xs text-gray-500">已掌握</div>
+                      </div>
+                      <div className="bg-white/70 rounded-lg p-2">
+                        <div className="text-lg font-bold text-yellow-600">{stats.learning}</div>
+                        <div className="text-xs text-gray-500">練緊</div>
+                      </div>
+                      <div className="bg-white/70 rounded-lg p-2">
+                        <div className="text-lg font-bold text-gray-600">{stats.newWords}</div>
+                        <div className="text-xs text-gray-500">未開始</div>
+                      </div>
+                      <div className="bg-white/70 rounded-lg p-2">
+                        <div className="text-lg font-bold text-red-600">{stats.forgotten}</div>
+                        <div className="text-xs text-gray-500">要複習</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-sm text-green-600">
-                  {customList.words.length} 個字要練習
+              );
+            })()}
+
+            {/* Fallback for no active list */}
+            {!activeWordList && (
+              <div className="w-full max-w-lg bg-blue-50 border-2 border-blue-300 rounded-xl p-4 text-center">
+                <div className="font-bold text-blue-700 text-lg">
+                  📋 內置生字表
+                </div>
+                <div className="text-sm text-blue-600 mt-1">
+                  {getWordsForPractice().length} 個字
                 </div>
               </div>
             )}
@@ -496,8 +766,8 @@ export default function Home() {
               onClick={startPlaying}
               className="
                 w-full max-w-sm
-                px-8 py-5 sm:px-12 sm:py-6
-                text-xl sm:text-2xl font-bold
+                px-8 py-6 sm:px-12 sm:py-8
+                text-2xl sm:text-3xl font-bold
                 bg-gradient-to-r from-green-400 to-green-600
                 hover:from-green-500 hover:to-green-700
                 active:from-green-600 active:to-green-800
@@ -510,20 +780,25 @@ export default function Home() {
               🚀 開始練習！
             </button>
 
-            {/* Progress Overview */}
-            <div className="w-full max-w-md mt-2">
-              <ProgressBar
-                current={Object.values(progress.wordProgress).filter((w) => w.mastered).length}
-                total={Object.keys(progress.wordProgress).length || 1}
-                label="已掌握嘅字"
-                showStars
-                stars={progress.totalStars}
-              />
+            {/* Simple Stats */}
+            <div className="flex gap-4 text-center">
+              <div className="bg-yellow-100 px-4 py-2 rounded-xl">
+                <div className="text-2xl">⭐</div>
+                <div className="text-lg font-bold text-yellow-700">{progress.totalStars}</div>
+                <div className="text-xs text-yellow-600">星星</div>
+              </div>
+              {progress.streakDays > 0 && (
+                <div className="bg-orange-100 px-4 py-2 rounded-xl">
+                  <div className="text-2xl">🔥</div>
+                  <div className="text-lg font-bold text-orange-700">{progress.streakDays}</div>
+                  <div className="text-xs text-orange-600">連續天數</div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {screen === 'play' && currentWord && (
+        {activeTab === 'play' && isPracticing && currentWord && (
           <div className="py-2 sm:py-4">
             {/* Session Progress */}
             <div className="mb-4 sm:mb-6">
@@ -561,7 +836,7 @@ export default function Home() {
 
             {/* Skill Buttons */}
             {(progress.currentMode === 'fill' || progress.currentMode === 'spell') && (
-              <div className="mt-4 flex justify-center gap-3">
+              <div className="mt-4 flex justify-center gap-3 flex-wrap">
                 {progress.pet.unlockedSkills.includes('peek') && (
                   <button
                     onClick={() => handleUsePeekSkill('peek')}
@@ -580,6 +855,21 @@ export default function Home() {
                     <span>偷睇 2 個字母</span>
                   </button>
                 )}
+                {/* Mnemonic hint button */}
+                <button
+                  onClick={() => setShowMnemonicHint(!showMnemonicHint)}
+                  className="flex items-center gap-2 px-4 py-2 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 rounded-full font-medium transition-colors"
+                >
+                  <span>💡</span>
+                  <span>記憶法</span>
+                </button>
+              </div>
+            )}
+
+            {/* Mnemonic Hint Display */}
+            {showMnemonicHint && currentWord && (
+              <div className="mt-4 max-w-md mx-auto">
+                <MnemonicHint word={currentWord.word} />
               </div>
             )}
 
@@ -595,19 +885,20 @@ export default function Home() {
             {/* Back Button */}
             <div className="mt-6 sm:mt-8 text-center">
               <button
-                onClick={() => setScreen('home')}
+                onClick={() => setIsPracticing(false)}
                 className="px-6 py-3 text-gray-500 hover:text-gray-700 active:text-gray-900 text-base sm:text-lg"
               >
-                ← 返回主頁
+                ← 返回
               </button>
             </div>
           </div>
         )}
 
-        {screen === 'badges' && (
+        {/* PET TAB - Badges Screen */}
+        {activeTab === 'pet' && petScreen === 'badges' && (
           <div className="py-4 sm:py-8">
             <button
-              onClick={() => setScreen('home')}
+              onClick={() => setPetScreen('main')}
               className="mb-4 px-4 py-2 text-blue-500 hover:text-blue-700 active:text-blue-900 text-lg"
             >
               ← 返回
@@ -616,15 +907,9 @@ export default function Home() {
           </div>
         )}
 
-        {screen === 'pet' && (
+        {/* PET TAB - Main Screen */}
+        {activeTab === 'pet' && petScreen === 'main' && (
           <div className="py-4 sm:py-8">
-            <button
-              onClick={() => setScreen('home')}
-              className="mb-4 px-4 py-2 text-blue-500 hover:text-blue-700 active:text-blue-900 text-lg"
-            >
-              ← 返回
-            </button>
-
             {/* Pet Display */}
             <div className="flex flex-col items-center gap-4">
               {/* Speech Bubble */}
@@ -941,15 +1226,24 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Shop Button */}
-              <button
-                onClick={() => setScreen('shop')}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 text-white font-bold rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all"
-              >
-                <span className="text-xl">🏪</span>
-                <span>星星商店</span>
-                <span className="bg-white/30 px-2 py-0.5 rounded-full text-sm">⭐ {progress.totalStars}</span>
-              </button>
+              {/* Shop & Badges Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPetScreen('shop')}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-400 text-white font-bold rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all"
+                >
+                  <span className="text-xl">🏪</span>
+                  <span>星星商店</span>
+                  <span className="bg-white/30 px-2 py-0.5 rounded-full text-sm">⭐ {progress.totalStars}</span>
+                </button>
+                <button
+                  onClick={() => setPetScreen('badges')}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-400 to-pink-400 text-white font-bold rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all"
+                >
+                  <span className="text-xl">🏆</span>
+                  <span>獎章</span>
+                </button>
+              </div>
 
               {/* Skills Section */}
               {progress.pet.unlockedSkills.length > 0 && (
@@ -991,7 +1285,7 @@ export default function Home() {
 
               {/* Practice CTA */}
               <button
-                onClick={() => setScreen('home')}
+                onClick={() => setActiveTab('play')}
                 className="mt-4 px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-full shadow-lg hover:shadow-xl active:scale-95 transition-all"
               >
                 去練習串字！📚
@@ -1000,10 +1294,11 @@ export default function Home() {
           </div>
         )}
 
-        {screen === 'shop' && (
+        {/* PET TAB - Shop Screen */}
+        {activeTab === 'pet' && petScreen === 'shop' && (
           <div className="py-4 sm:py-8">
             <button
-              onClick={() => setScreen('pet')}
+              onClick={() => setPetScreen('main')}
               className="mb-4 px-4 py-2 text-blue-500 hover:text-blue-700 active:text-blue-900 text-lg"
             >
               ← 返回
@@ -1109,6 +1404,166 @@ export default function Home() {
             </div>
           </div>
         )}
+
+        {/* PARENT TAB */}
+        {activeTab === 'parent' && (
+          <div className="py-4 sm:py-8">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                👨‍👩‍👧 家長設定
+              </h1>
+            </div>
+
+            <div className="flex flex-col gap-6 max-w-lg mx-auto">
+              {/* Mode Selector */}
+              <div className="bg-white rounded-2xl p-4 shadow-md">
+                <h2 className="text-lg font-bold text-gray-700 mb-3">📚 練習模式</h2>
+                <ModeSelector
+                  currentMode={progress.currentMode}
+                  onSelectMode={handleSelectMode}
+                />
+              </div>
+
+              {/* Word List Manager */}
+              <div className="bg-white rounded-2xl p-4 shadow-md">
+                <h2 className="text-lg font-bold text-gray-700 mb-3">📋 生字表管理</h2>
+                <WordListManager
+                  onSelectList={(list) => handleSetActiveList(list.id)}
+                  onUseBuiltIn={() => handleSetActiveList(null)}
+                  selectedListId={progress.activeWordListId}
+                />
+              </div>
+
+              {/* Progress Report */}
+              <div className="bg-white rounded-2xl p-4 shadow-md">
+                <h2 className="text-lg font-bold text-gray-700 mb-3">📊 學習進度</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {Object.values(progress.wordProgress).filter(w => w.mastered).length}
+                    </div>
+                    <div className="text-xs text-blue-500">已掌握生字</div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-green-600">
+                      {Object.values(progress.wordProgress).reduce((sum, w) => sum + w.attempts, 0)}
+                    </div>
+                    <div className="text-xs text-green-500">總練習次數</div>
+                  </div>
+                  <div className="bg-yellow-50 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {progress.totalStars}
+                    </div>
+                    <div className="text-xs text-yellow-500">獲得星星</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-xl p-3 text-center">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {progress.streakDays}
+                    </div>
+                    <div className="text-xs text-orange-500">連續練習天數</div>
+                  </div>
+                </div>
+
+                {/* Overall Progress Bar */}
+                <div className="mt-4">
+                  <ProgressBar
+                    current={Object.values(progress.wordProgress).filter(w => w.mastered).length}
+                    total={Math.max(Object.keys(progress.wordProgress).length, 1)}
+                    label="整體掌握進度"
+                  />
+                </div>
+              </div>
+
+              {/* Account Info */}
+              <div className="bg-white rounded-2xl p-4 shadow-md">
+                <h2 className="text-lg font-bold text-gray-700 mb-3">👤 帳戶</h2>
+                {currentUser ? (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-gray-800">{currentUser.displayName}</div>
+                      <div className="text-xs text-gray-500">已登入（雲端同步）</div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-600 font-bold rounded-xl transition-colors"
+                    >
+                      登出
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-gray-800">訪客模式</div>
+                      <div className="text-xs text-gray-500">資料只存喺呢部機</div>
+                    </div>
+                    <button
+                      onClick={() => setIsLoggedIn(false)}
+                      className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-600 font-bold rounded-xl transition-colors"
+                    >
+                      登入/註冊
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ADVENTURE TAB */}
+        {activeTab === 'adventure' && adventureScreen === 'map' && (
+          <AdventureMap
+            pet={progress.pet}
+            adventureProgress={progress.adventureProgress}
+            onStageSelect={handleAdventureStageSelect}
+            onBossSelect={handleAdventureBossSelect}
+            onSpellingTestSelect={handleSpellingTestSelect}
+          />
+        )}
+
+        {activeTab === 'adventure' && adventureScreen === 'stage' && currentWorldId && currentStageNum && (
+          (() => {
+            const world = getWorldById(currentWorldId);
+            const stage = getStageById(currentWorldId, currentStageNum);
+            if (!world || !stage) return null;
+            return (
+              <StagePlay
+                world={world}
+                stage={stage}
+                mode={progress.currentMode}
+                activeWordListId={progress.activeWordListId}
+                onComplete={handleAdventureStageComplete}
+                onExit={handleAdventureExit}
+              />
+            );
+          })()
+        )}
+
+        {activeTab === 'adventure' && adventureScreen === 'boss' && currentWorldId && (
+          (() => {
+            const world = getWorldById(currentWorldId);
+            if (!world) return null;
+            return (
+              <BossBattle
+                world={world}
+                boss={world.boss}
+                mode={progress.currentMode}
+                activeWordListId={progress.activeWordListId}
+                onVictory={handleAdventureBossVictory}
+                onDefeat={handleAdventureExit}
+                onExit={handleAdventureExit}
+              />
+            );
+          })()
+        )}
+
+        {/* Spelling Test Challenge */}
+        {activeTab === 'adventure' && adventureScreen === 'spelling-test' && currentSpellingTestStage && (
+          <SpellingTestChallenge
+            stage={currentSpellingTestStage}
+            onComplete={handleSpellingTestComplete}
+            onExit={handleAdventureExit}
+          />
+        )}
       </div>
 
       {/* XP Gain Animation */}
@@ -1157,6 +1612,38 @@ export default function Home() {
               className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-full text-lg shadow-lg hover:shadow-xl active:scale-95 transition-all"
             >
               太好喇！ 🎊
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Streak Milestone Modal */}
+      {showMilestone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center animate-scale-in shadow-2xl">
+            <div className="text-6xl mb-4 animate-bounce">{showMilestone.emoji}</div>
+            <h2 className="text-2xl font-bold text-orange-600 mb-2">連勝里程碑！</h2>
+            <div className="bg-gradient-to-r from-orange-100 to-yellow-100 rounded-2xl p-4 my-4">
+              <div className="text-4xl font-bold text-orange-600 mb-1">
+                {showMilestone.days} 日連勝
+              </div>
+              <div className="text-lg text-orange-500">
+                {showMilestone.reward}
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-2 text-lg text-yellow-600 mb-6">
+              <span>+{showMilestone.xp}</span>
+              <span className="text-xl">⭐</span>
+              <span>XP</span>
+            </div>
+            <p className="text-gray-600 mb-6">
+              繼續保持，挑戰更高紀錄！
+            </p>
+            <button
+              onClick={() => setShowMilestone(null)}
+              className="px-8 py-3 bg-gradient-to-r from-orange-500 to-yellow-500 text-white font-bold rounded-full text-lg shadow-lg hover:shadow-xl active:scale-95 transition-all"
+            >
+              繼續努力！ 🔥
             </button>
           </div>
         </div>
@@ -1217,6 +1704,9 @@ export default function Home() {
       <footer className="text-center py-6 sm:py-8 text-gray-400 text-xs sm:text-sm px-4">
         <p>專為小朋友設計嘅串字練習 💙</p>
       </footer>
+
+      {/* Bottom Tab Bar */}
+      <BottomTabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </main>
   );
 }

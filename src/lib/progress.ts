@@ -84,6 +84,12 @@ export interface UserProgress {
   lastXPDate: string;
   isFirstSessionToday: boolean;
   wordsCompletedToday: number;
+
+  // Parent settings
+  activeWordListId?: string; // null/undefined = use built-in words
+
+  // Adventure mode
+  adventureProgress?: import('./adventure').AdventureProgress;
 }
 
 const STORAGE_KEY = 'spelling-practice-progress';
