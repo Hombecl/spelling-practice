@@ -54,12 +54,24 @@ export default function LetterButton({
     }
   };
 
+  // Screen reader status description
+  const getAriaDescription = () => {
+    if (correct) return '正確 Correct';
+    if (incorrect) return '錯誤 Incorrect';
+    if (selected) return '已選擇 Selected';
+    if (disabled) return '已使用 Already used';
+    return '可選擇 Available';
+  };
+
   return (
     <button
       className={`${baseClasses} ${stateClasses}`}
       onClick={handleClick}
       disabled={disabled}
-      aria-label={`Letter ${letter}`}
+      aria-label={`字母 ${letter.toUpperCase()}, ${getAriaDescription()}`}
+      aria-pressed={selected}
+      aria-disabled={disabled}
+      role="button"
     >
       {letter.toUpperCase()}
     </button>

@@ -55,13 +55,13 @@ export default function ModeSelector({ currentMode, onSelectMode }: ModeSelector
   };
 
   return (
-    <div className="w-full max-w-lg">
-      <h2 className="text-xl font-bold text-gray-700 mb-4 text-center">
+    <div className="w-full max-w-lg" role="region" aria-labelledby="mode-selector-title">
+      <h2 id="mode-selector-title" className="text-xl font-bold text-gray-700 mb-4 text-center">
         🎯 選擇練習階段
       </h2>
 
       {/* Progress Arrow */}
-      <div className="flex items-center justify-center gap-1 text-xs text-gray-400 mb-4">
+      <div className="flex items-center justify-center gap-1 text-xs text-gray-400 mb-4" aria-hidden="true">
         <span className="px-2 py-1 bg-blue-100 text-blue-600 rounded">認字</span>
         <span>→</span>
         <span className="px-2 py-1 bg-yellow-100 text-yellow-600 rounded">填充</span>
@@ -69,7 +69,7 @@ export default function ModeSelector({ currentMode, onSelectMode }: ModeSelector
         <span className="px-2 py-1 bg-green-100 text-green-600 rounded">串字</span>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3" role="radiogroup" aria-label="練習階段選擇">
         {modes.map(({ mode, stage, name, description, emoji, color }) => {
           const isSelected = currentMode === mode;
           const colorClasses = getColorClasses(color, isSelected);
@@ -78,14 +78,18 @@ export default function ModeSelector({ currentMode, onSelectMode }: ModeSelector
             <button
               key={mode}
               onClick={() => onSelectMode(mode)}
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`${stage} ${name}: ${description}`}
               className={`
                 w-full p-4 rounded-xl border-2 text-left transition-all
                 active:scale-98
+                focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2
                 ${isSelected ? colorClasses.selected + ' shadow-md' : colorClasses.unselected}
               `}
             >
               <div className="flex items-center gap-3">
-                <div className="text-4xl">{emoji}</div>
+                <div className="text-4xl" aria-hidden="true">{emoji}</div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${colorClasses.badge}`}>
@@ -96,7 +100,7 @@ export default function ModeSelector({ currentMode, onSelectMode }: ModeSelector
                   <div className="text-sm text-gray-500">{description}</div>
                 </div>
                 {isSelected && (
-                  <span className="text-2xl">✓</span>
+                  <span className="text-2xl" aria-hidden="true">✓</span>
                 )}
               </div>
             </button>
