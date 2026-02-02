@@ -40,57 +40,60 @@ function buildPrompt(mode: string, highlightColors?: string[]): string {
   }
 
   if (mode === 'highlighted') {
-    // GPT-4o optimized prompt - more explicit about visual characteristics
-    return `You are looking at a photo of a Hong Kong primary school English textbook or worksheet.
+    // Strong prompt to prevent raw OCR - emphasize visual highlight detection
+    return `⚠️ CRITICAL: This is NOT an OCR task. Do NOT transcribe all text from the image.
 
-TASK: Find all English words/phrases that have been HIGHLIGHTED with a ${colorDesc} highlighter pen.
+You are analyzing a photo of a Hong Kong primary school English textbook page.
 
-VISUAL CHARACTERISTICS OF HIGHLIGHTED TEXT:
-- Text has a semi-transparent colored background (${colorDesc})
-- The highlight color overlays the text, making it stand out
-- NOT just bold or underlined text - specifically highlighter marker
-- The highlight may be slightly uneven (hand-drawn)
+YOUR ONLY TASK: Find words that have been marked with a ${colorDesc} HIGHLIGHTER PEN by a student.
 
-IMPORTANT:
-- ONLY extract words that are visually highlighted with highlighter pen
-- Do NOT extract regular printed text without highlighting
-- Do NOT extract text that is just bold, underlined, or in a colored box
-- Ignore headers, page numbers, publisher names (like "MING PAO")
+WHAT A HIGHLIGHTER MARK LOOKS LIKE:
+- A semi-transparent colored stripe (${colorDesc}) drawn OVER the text
+- The colored mark was added BY HAND with a highlighter marker
+- It's NOT printed formatting - it's a physical highlighter mark on paper
 
-OUTPUT FORMAT:
-- List each highlighted word or phrase on a separate line
-- No numbers, bullets, or explanations
-- Just the words themselves
-- If a complete phrase is highlighted, keep it together (e.g., "Good morning")
+WHAT TO IGNORE (DO NOT EXTRACT):
+❌ Regular printed text (even if bold or colorful)
+❌ Text in colored boxes or banners (these are printed, not highlighted)
+❌ Headers, titles, page numbers
+❌ Instructions or dialogue text
+❌ ANY text without a visible highlighter mark over it
 
-If no highlighted words are found, respond with: NO_WORDS_FOUND
+OUTPUT RULES:
+- ONLY list words/phrases with visible highlighter marks
+- One word or phrase per line
+- No bullets, numbers, or explanations
+- If you see NO highlighter marks, respond with exactly: NO_WORDS_FOUND
 
-${colorDescZh}螢光筆標記嘅英文字`;
+REMEMBER: Most of the text on this page is NOT highlighted. Only extract the few words (if any) that have a ${colorDesc} highlighter mark drawn over them.`;
   }
 
-  // Smart mode - AI picks vocabulary
-  return `You are looking at a photo of a Hong Kong primary school English textbook or worksheet.
+  // Smart mode - AI picks vocabulary (but still not raw OCR)
+  return `⚠️ CRITICAL: This is NOT an OCR task. Do NOT transcribe all text from the image.
 
-TASK: Identify the key English vocabulary words that a student should learn from this page.
+You are analyzing a photo of a Hong Kong primary school English textbook page.
 
-FOCUS ON:
-- Bold or enlarged vocabulary words
-- Words in vocabulary boxes or word lists
-- Key terms that are emphasized in any way
-- Important content words (nouns, verbs, adjectives)
+YOUR TASK: Identify the KEY VOCABULARY WORDS that a student should learn from this page.
 
-IGNORE:
-- Common words like "the", "is", "a", "to", "and"
-- Headers, page numbers, publisher names
-- Instructions text
+WHAT TO LOOK FOR:
+- Words that are BOLD or in a LARGER font
+- Words inside vocabulary boxes or word lists
+- Key nouns, verbs, and adjectives that are emphasized
+- Target vocabulary that the lesson is teaching
 
-OUTPUT FORMAT:
-- List each word or phrase on a separate line
-- No numbers, bullets, or explanations
-- Maximum 20 words
-- If a phrase is important, keep it together (e.g., "Good morning")
+WHAT TO IGNORE (DO NOT EXTRACT):
+❌ Common words (the, is, a, to, and, in, on, at, etc.)
+❌ Headers, page numbers, publisher names
+❌ Instructions or question text
+❌ Random text from the page
 
-If no suitable vocabulary is found, respond with: NO_WORDS_FOUND`;
+OUTPUT RULES:
+- List only important vocabulary words (max 15-20 words)
+- One word or phrase per line
+- No bullets, numbers, or explanations
+- If no clear vocabulary words found, respond with: NO_WORDS_FOUND
+
+REMEMBER: Extract ONLY key vocabulary, not all text on the page.`;
 }
 
 export async function POST(request: NextRequest) {
