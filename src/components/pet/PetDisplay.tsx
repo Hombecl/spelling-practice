@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { useState, useEffect } from 'react';
 import { PetState, PetStage, PetMood, PetSpecies, getPetMood, getPetStageName, getPetSvgPath, PET_SPECIES } from '@/lib/pet';
 
 // Fallback emoji by species and stage
@@ -10,7 +11,7 @@ const FALLBACK_EMOJIS: Record<PetSpecies, Record<PetStage, string>> = {
   dog: { egg: '🥚', baby: '🐕', child: '🐕‍🦺', teen: '🐺', adult: '🔥' },
 };
 
-// Pixel art stage-specific animation classes
+// Pixel art stage-specific animation classes (base bounce/float)
 const STAGE_ANIMATIONS: Record<PetStage, string> = {
   egg: 'pet-egg',
   baby: 'pet-baby',
@@ -18,6 +19,9 @@ const STAGE_ANIMATIONS: Record<PetStage, string> = {
   teen: 'pet-teen',
   adult: 'pet-adult',
 };
+
+// 3D turn animations for depth effect
+const TURN_ANIMATIONS = ['animate-look-around', 'animate-playful', 'animate-bounce-turn'];
 
 // Mood-based animation overrides
 const MOOD_ANIMATIONS: Record<PetMood, string> = {
@@ -70,6 +74,39 @@ export default function PetDisplay({
   const mood = getPetMood(pet.happiness, pet.lastFedDate);
   const species = pet.species || 'slime'; // Default to slime for backward compatibility
 
+  // State for 3D turn animation
+  const [turnAnimation, setTurnAnimation] = useState<string>('');
+
+  // Randomly trigger 3D turn animations for more lifelike feel
+  useEffect(() => {
+    // Only animate when pet is happy or content (not hungry/sleepy)
+    if (mood === 'hungry' || mood === 'sleepy') return;
+
+    const triggerRandomTurn = () => {
+      // Random chance to trigger a turn animation
+      if (Math.random() < 0.4) { // 40% chance
+        const randomAnim = TURN_ANIMATIONS[Math.floor(Math.random() * TURN_ANIMATIONS.length)];
+        setTurnAnimation(randomAnim);
+
+        // Clear after animation completes
+        setTimeout(() => {
+          setTurnAnimation('');
+        }, 4000); // Match the longest animation duration
+      }
+    };
+
+    // Trigger first animation after a short delay
+    const initialTimer = setTimeout(triggerRandomTurn, 2000);
+
+    // Set up interval for recurring animations
+    const interval = setInterval(triggerRandomTurn, 6000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [mood]);
+
   // Size configurations - larger for pixel art visibility
   const sizeConfig = {
     small: { container: 'w-20 h-20', imageSize: 64, emoji: 'text-4xl', name: 'text-xs' },
@@ -119,7 +156,7 @@ export default function PetDisplay({
       `}
       onClick={onClick}
     >
-      {/* Pet Image Container */}
+      {/* Pet Image Container with 3D perspective */}
       <div
         className={`
           ${config.container}
@@ -130,6 +167,7 @@ export default function PetDisplay({
           ${mood === 'happy' ? 'ring-4 ring-yellow-300/50' : ''}
           ${mood === 'hungry' || mood === 'sleepy' ? 'opacity-80' : ''}
           overflow-hidden
+          pet-3d-container
         `}
       >
         {/* Pixel grid background pattern */}
@@ -144,8 +182,17 @@ export default function PetDisplay({
           }}
         />
 
-        {/* Pet Pixel Art Image with animations */}
-        <div className={`${config.container} ${getAnimationClass()} p-2 pixel-art flex items-center justify-center`}>
+        {/* Pet Pixel Art Image with animations + 3D turn */}
+        <div
+          className={`
+            ${config.container}
+            ${getAnimationClass()}
+            ${turnAnimation}
+            p-2 pixel-art flex items-center justify-center
+            transition-transform duration-300
+          `}
+          style={{ transformStyle: 'preserve-3d' }}
+        >
           <Image
             src={imagePath}
             alt={`${pet.name} - ${getPetStageName(species, pet.stage)}`}

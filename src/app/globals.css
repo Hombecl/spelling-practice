@@ -431,6 +431,130 @@ body {
   animation: slime-king 2.5s ease-in-out infinite;
 }
 
+/* ========== 3D Turn Animations for depth ========== */
+/* Makes pets feel more alive with left-right turning */
+
+/* 3D perspective container */
+.pet-3d-container {
+  perspective: 500px;
+  transform-style: preserve-3d;
+}
+
+/* Gentle turn left-right (idle looking around) */
+@keyframes pet-look-around {
+  0%, 100% {
+    transform: rotateY(0deg) translateY(0);
+  }
+  15% {
+    transform: rotateY(-15deg) translateY(-5px);
+  }
+  35% {
+    transform: rotateY(-15deg) translateY(-5px);
+  }
+  50% {
+    transform: rotateY(0deg) translateY(0);
+  }
+  65% {
+    transform: rotateY(15deg) translateY(-5px);
+  }
+  85% {
+    transform: rotateY(15deg) translateY(-5px);
+  }
+}
+
+/* Quick turn on interaction */
+@keyframes pet-turn-left {
+  0% { transform: rotateY(0deg); }
+  50% { transform: rotateY(-25deg) scale(1.05); }
+  100% { transform: rotateY(0deg); }
+}
+
+@keyframes pet-turn-right {
+  0% { transform: rotateY(0deg); }
+  50% { transform: rotateY(25deg) scale(1.05); }
+  100% { transform: rotateY(0deg); }
+}
+
+/* Happy spin on correct answer */
+@keyframes pet-happy-spin {
+  0% { transform: rotateY(0deg) scale(1); }
+  25% { transform: rotateY(90deg) scale(1.1); }
+  50% { transform: rotateY(180deg) scale(1); }
+  75% { transform: rotateY(270deg) scale(1.1); }
+  100% { transform: rotateY(360deg) scale(1); }
+}
+
+/* Nod animation (looking up and down) */
+@keyframes pet-nod {
+  0%, 100% { transform: rotateX(0deg); }
+  30% { transform: rotateX(-10deg); }
+  60% { transform: rotateX(5deg); }
+}
+
+/* Combined bounce with turn for more life */
+@keyframes pet-bounce-turn {
+  0%, 100% {
+    transform: translateY(0) rotateY(0deg) scaleY(1);
+  }
+  25% {
+    transform: translateY(-15px) rotateY(-10deg) scaleY(1.1);
+  }
+  50% {
+    transform: translateY(-20px) rotateY(0deg) scaleY(1.05);
+  }
+  75% {
+    transform: translateY(-15px) rotateY(10deg) scaleY(1.1);
+  }
+}
+
+/* Playful wiggle with perspective */
+@keyframes pet-playful {
+  0%, 100% {
+    transform: rotateY(0deg) rotateZ(0deg);
+  }
+  20% {
+    transform: rotateY(-12deg) rotateZ(-3deg);
+  }
+  40% {
+    transform: rotateY(12deg) rotateZ(3deg);
+  }
+  60% {
+    transform: rotateY(-8deg) rotateZ(-2deg);
+  }
+  80% {
+    transform: rotateY(8deg) rotateZ(2deg);
+  }
+}
+
+/* Animation classes */
+.animate-look-around {
+  animation: pet-look-around 4s ease-in-out infinite;
+}
+
+.animate-turn-left {
+  animation: pet-turn-left 0.4s ease-out;
+}
+
+.animate-turn-right {
+  animation: pet-turn-right 0.4s ease-out;
+}
+
+.animate-happy-spin {
+  animation: pet-happy-spin 0.8s ease-in-out;
+}
+
+.animate-nod {
+  animation: pet-nod 0.5s ease-in-out;
+}
+
+.animate-bounce-turn {
+  animation: pet-bounce-turn 1.2s ease-in-out infinite;
+}
+
+.animate-playful {
+  animation: pet-playful 2s ease-in-out infinite;
+}
+
 /* Larger touch targets for children - mobile optimized */
 button {
   min-height: 44px;
