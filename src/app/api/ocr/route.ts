@@ -3,9 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 // OpenRouter API endpoint (OpenAI-compatible)
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// GPT-4o - best vision model for understanding visual context like highlighters
-// Switched from Gemini due to poor highlight detection
-const MODEL = 'openai/gpt-4o';
+// GPT-4.1 Mini - good vision model with better availability
+// Switched from GPT-4o which may have availability issues on OpenRouter
+const MODEL = 'openai/gpt-4.1-mini';
 
 // Fallback model if GPT-4o fails
 const FALLBACK_MODEL = 'google/gemini-2.5-flash-preview-05-20';
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildPrompt(mode, highlightColors);
 
-    console.log('[OCR] Calling GPT-4o with mode:', mode);
+    console.log('[OCR] Calling GPT-4.1-mini with mode:', mode);
 
     // Try GPT-4o first
     let response = await fetch(OPENROUTER_API_URL, {
@@ -151,8 +151,8 @@ export async function POST(request: NextRequest) {
 
     // If GPT-4o fails, try fallback
     if (!response.ok) {
-      fallbackReason = `GPT-4o failed with status ${response.status}`;
-      console.log('[OCR] GPT-4o failed, trying fallback model:', response.status);
+      fallbackReason = `GPT-4.1-mini failed with status ${response.status}`;
+      console.log('[OCR] GPT-4.1-mini failed, trying fallback model:', response.status);
       response = await fetch(OPENROUTER_API_URL, {
         method: 'POST',
         headers: {
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
         words: [],
         highlightedWords: [],
         rawText: rawOutput,
-        source: modelUsed === MODEL ? 'gpt4o-ocr' : 'gemini-ocr',
+        source: modelUsed === MODEL ? 'gpt4.1mini-ocr' : 'gemini-ocr',
         modelUsed,
         fallbackReason: fallbackReason || undefined,
       });
@@ -222,7 +222,7 @@ export async function POST(request: NextRequest) {
       words,
       highlightedWords,
       rawText: rawOutput,
-      source: modelUsed === MODEL ? 'gpt4o-ocr' : 'gemini-ocr',
+      source: modelUsed === MODEL ? 'gpt4.1mini-ocr' : 'gemini-ocr',
       modelUsed,
       fallbackReason: fallbackReason || undefined,
     });
