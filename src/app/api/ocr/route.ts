@@ -28,16 +28,11 @@ function buildVisionPrompt(mode: string, highlightColors?: string[], phraseMode?
     colorDesc = highlightColors.map(c => colorMapEn[c] || c).join(' or ');
   }
 
-  const outputFormat = phraseMode
-    ? `- Output each highlighted item on its own line (can be single words OR short phrases like "is flying", "do not harm")
-- Include the EXACT text that is highlighted, preserving phrases if multiple words are marked together`
-    : `- Output each highlighted WORD on its own line (single words only)
-- If a phrase is highlighted, extract the KEY WORD from it (e.g., from "is flying" extract "flying")`;
-
+  // Always preserve phrases - we'll let the UI handle splitting if needed
   if (mode === 'highlighted') {
     return `You are a visual analyzer looking at a photo of an English textbook page.
 
-CRITICAL TASK: Find text that has been physically marked with a ${colorDesc} HIGHLIGHTER PEN.
+CRITICAL TASK: Find ALL text that has been physically marked with a ${colorDesc} HIGHLIGHTER PEN.
 
 WHAT HIGHLIGHTER MARKS LOOK LIKE:
 - A semi-transparent colored stripe/band going THROUGH the text
@@ -45,52 +40,55 @@ WHAT HIGHLIGHTER MARKS LOOK LIKE:
 - Like someone used a real highlighter marker to draw over words
 - The highlight may be messy, uneven, or partially covering words
 
-⚠️ IMPORTANT: Do NOT guess vocabulary words. Do NOT pick important-looking words.
-ONLY report words that VISUALLY have a colored highlighter mark on them.
+⚠️ VERY IMPORTANT RULES:
+1. Do NOT guess vocabulary words. ONLY report text with VISIBLE highlighter marks.
+2. PRESERVE PHRASES: If multiple words are highlighted together in ONE continuous mark, output them as ONE phrase.
+   - Example: If "beautiful flower" is highlighted with one stroke → output "beautiful flower"
+   - Example: If "thank you" is highlighted together → output "thank you"
+   - Example: If "food" and "drinks" are highlighted separately → output them as separate items
+3. Look for EACH separate highlighter stroke. Each stroke = one output line.
 
-Look carefully at the image. If you see ${colorDesc} colored bands/stripes over any text, those are the highlighted words.
+HOW TO DECIDE IF IT'S ONE PHRASE OR SEPARATE WORDS:
+- If the highlighter mark is ONE continuous band covering multiple words → ONE phrase
+- If there are separate/distinct highlighter marks on different words → separate items
+- When in doubt, preserve as phrase (better to keep together than split wrongly)
 
 OUTPUT FORMAT:
-${outputFormat}
+- One highlighted item per line (can be single word OR phrase)
 - No bullets, numbers, or explanations
 - No Chinese text
-- ONLY words with visible highlighter marks
+- Preserve the EXACT text that is highlighted
 
 If you cannot see any ${colorDesc} highlighter marks on any text, respond with exactly: NO_WORDS_FOUND`;
   }
 
-  // Smart mode - AI picks vocabulary
-  const smartOutputFormat = phraseMode
-    ? `- Can include single words OR short phrases (2-4 words) that form a unit
-- Example phrases: "is flying", "look at", "do not harm"`
-    : `- Single words only
-- Extract key words from phrases`;
-
+  // Smart mode - AI picks vocabulary (preserve meaningful phrases)
   return `You are looking at a photo of a Hong Kong primary school English textbook page.
 
-YOUR TASK: Identify the KEY VOCABULARY WORDS that a student should learn for spelling practice.
+YOUR TASK: Identify KEY VOCABULARY for spelling practice.
 
 WHAT TO LOOK FOR:
-- Important nouns (things, animals, people, places)
-- Action verbs (run, jump, fly, dance, sing)
-- Descriptive adjectives (happy, beautiful, little)
-- Words that appear in vocabulary lists or are emphasized in the textbook
-- Words suitable for primary school spelling practice (age 6-12)
+- Important nouns, verbs, adjectives
+- Common phrases that should be learned together (e.g., "thank you", "excuse me", "good morning")
+- Words/phrases suitable for primary school (age 6-12)
 
 WHAT TO IGNORE:
-❌ Common words: the, is, a, an, to, and, in, on, at, of, for, with, etc.
-❌ Pronouns: I, you, he, she, it, we, they, my, your, etc.
-❌ Question words: what, where, when, how, why
-❌ Page numbers, headers, instructions, publisher names
-❌ Chinese text
-❌ Single letters
+❌ Common words alone: the, is, a, an, to, and, in, on, at, of, for, with
+❌ Pronouns alone: I, you, he, she, it, we, they
+❌ Page numbers, headers, Chinese text
 
-OUTPUT RULES:
-${smartOutputFormat}
-- One item per line
+PHRASE RULES - VERY IMPORTANT:
+Keep these types of phrases together (DO NOT split):
+- Greetings: "thank you", "good morning", "excuse me", "how are you"
+- Verb phrases: "is flying", "are singing", "do not harm"
+- Noun phrases: "beautiful flower", "little girl", "good things"
+- Fixed expressions: "look at", "listen to", "a lot of"
+
+OUTPUT FORMAT:
+- One item per line (single word OR phrase)
 - No bullets, numbers, or explanations
-- Maximum 15-20 items
-- If no clear vocabulary words found, respond with: NO_WORDS_FOUND`;
+- Maximum 20 items
+- If no clear vocabulary, respond with: NO_WORDS_FOUND`;
 }
 
 // Call Gemini Vision to analyze the image directly
@@ -161,8 +159,22 @@ async function callGeminiVision(
   }
 }
 
+// Common phrases that should NEVER be split (for spelling practice)
+const UNSPLITTABLE_PHRASES = new Set([
+  'thank you', 'excuse me', 'good morning', 'good afternoon', 'good evening',
+  'good night', 'good bye', 'how are you', 'nice to meet you', 'see you',
+  'of course', 'a lot', 'a lot of', 'lots of', 'kind of', 'sort of',
+  'look at', 'listen to', 'wait for', 'ask for', 'look for',
+  'wake up', 'get up', 'sit down', 'stand up', 'come in', 'go out',
+  'turn on', 'turn off', 'put on', 'take off', 'pick up', 'put down',
+  'do not', 'does not', 'did not', 'will not', 'would not', 'could not',
+  'don\'t', 'doesn\'t', 'didn\'t', 'won\'t', 'wouldn\'t', 'couldn\'t',
+  'i\'m', 'you\'re', 'he\'s', 'she\'s', 'it\'s', 'we\'re', 'they\'re',
+  'i am', 'you are', 'he is', 'she is', 'it is', 'we are', 'they are',
+]);
+
 // Parse AI output to extract words/phrases
-function parseAIOutput(text: string, phraseMode: boolean = false): string[] {
+function parseAIOutput(text: string, _phraseMode: boolean = false): string[] {
   const words: string[] = [];
   const seen = new Set<string>();
 
@@ -271,11 +283,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Mark which items are phrases vs single words
+    const items = result.words.map(word => ({
+      text: word,
+      isPhrase: word.includes(' '),
+      canSplit: word.includes(' ') && !UNSPLITTABLE_PHRASES.has(word.toLowerCase()),
+    }));
+
     const finalResponse = {
       success: true,
       words: result.words,
+      items: items, // New: structured items with phrase info
       highlightedWords: mode === 'highlighted' ? result.words : [],
-      rawText: `[Gemini 2.0 Flash Vision - ${mode} mode${phraseMode ? ' (phrases)' : ''}]\n\n${result.rawOutput}`,
+      rawText: `[Gemini 3 Flash Vision - ${mode} mode]\n\n${result.rawOutput}`,
       source: 'gemini-vision',
       modelUsed: AI_MODEL,
     };
