@@ -289,9 +289,18 @@ async function tryGeminiOCR(
 
     const data: GeminiOCRResponse = await response.json();
 
+    console.log('[OCR Client] API Response:', {
+      success: data.success,
+      source: data.source,
+      modelUsed: data.modelUsed,
+      wordsCount: data.words?.length,
+      rawTextPreview: data.rawText?.substring(0, 200),
+      error: data.error,
+    });
+
     // If API says to use local OCR, return null to trigger fallback
     if (data.useLocalOCR || !response.ok) {
-      console.log('[OCR] Gemini OCR unavailable, falling back to Tesseract');
+      console.log('[OCR Client] API unavailable, falling back to Tesseract');
       return null;
     }
 

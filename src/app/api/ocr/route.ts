@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // ===========================================
-// TWO-STEP OCR APPROACH:
-// 1. Google Cloud Vision API - accurate OCR with word positions
-// 2. AI (via OpenRouter) - understand which words are highlighted
+// GEMINI VISION OCR APPROACH:
+// Use Gemini 2.0 Flash to directly analyze the image
+// - Can see highlighter colors
+// - Can understand context
+// - Returns vocabulary words directly
 // ===========================================
 
-const GOOGLE_VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Use GPT-4o-mini for highlight analysis (good at following instructions)
-const AI_MODEL = 'openai/gpt-4o-mini';
+// Use Gemini 2.0 Flash for vision (better at following instructions than 2.5)
+const AI_MODEL = 'google/gemini-2.0-flash-001';
 
-// Build prompt for AI to identify highlighted words from OCR text
-function buildHighlightAnalysisPrompt(ocrText: string, mode: string, highlightColors?: string[]): string {
+// Build prompt for Gemini Vision to analyze the image directly
+function buildVisionPrompt(mode: string, highlightColors?: string[], phraseMode?: boolean): string {
   let colorDesc = 'any color';
 
   if (mode === 'highlighted' && highlightColors && highlightColors.length > 0 && highlightColors.length < 5) {
@@ -27,145 +28,82 @@ function buildHighlightAnalysisPrompt(ocrText: string, mode: string, highlightCo
     colorDesc = highlightColors.map(c => colorMapEn[c] || c).join(' or ');
   }
 
+  const outputFormat = phraseMode
+    ? `- Output each highlighted item on its own line (can be single words OR short phrases like "is flying", "do not harm")
+- Include the EXACT text that is highlighted, preserving phrases if multiple words are marked together`
+    : `- Output each highlighted WORD on its own line (single words only)
+- If a phrase is highlighted, extract the KEY WORD from it (e.g., from "is flying" extract "flying")`;
+
   if (mode === 'highlighted') {
-    return `You are analyzing OCR text extracted from a photo of a Hong Kong primary school English textbook page.
+    return `You are looking at a photo of a Hong Kong primary school English textbook page.
 
-The student has marked some words with a ${colorDesc} HIGHLIGHTER PEN for spelling practice.
+A student has used a ${colorDesc} HIGHLIGHTER PEN to mark words for spelling practice.
 
-Here is ALL the text from the page (from OCR):
----
-${ocrText}
----
+YOUR TASK: Look at the image and identify ALL text that has been marked with highlighter.
 
-YOUR TASK: From the OCR text above, identify which English words are likely the KEY VOCABULARY WORDS that a student would highlight for spelling practice.
-
-WHAT TO LOOK FOR:
-- Nouns (things, animals, people, places)
-- Verbs (action words)
-- Adjectives (describing words)
-- Words that appear in vocabulary lists or are emphasized
-- Words that are suitable for primary school spelling practice
-
-WHAT TO IGNORE:
-❌ Common words: the, is, a, an, to, and, in, on, at, of, for, with, etc.
-❌ Pronouns: I, you, he, she, it, we, they, my, your, etc.
-❌ Question words in instructions: what, where, when, how, why
-❌ Page numbers, headers, publisher names
-❌ Chinese text
-❌ Single letters or gibberish
+HOW TO IDENTIFY HIGHLIGHTED TEXT:
+- Look for text with a colored background (${colorDesc})
+- Highlighter marks appear as semi-transparent colored overlay on text
+- The highlighting may not be perfect - look for any colored marking over text
 
 OUTPUT RULES:
-- List ONLY the vocabulary words (max 15-20 words)
-- One word per line
+${outputFormat}
 - No bullets, numbers, or explanations
-- If no suitable vocabulary words found, respond with: NO_WORDS_FOUND`;
+- No Chinese text
+- If you cannot see any highlighted text, respond with: NO_WORDS_FOUND
+
+IMPORTANT: Only output the highlighted words/phrases. Do not include any other text from the page.`;
   }
 
   // Smart mode - AI picks vocabulary
-  return `You are analyzing OCR text extracted from a photo of a Hong Kong primary school English textbook page.
+  const smartOutputFormat = phraseMode
+    ? `- Can include single words OR short phrases (2-4 words) that form a unit
+- Example phrases: "is flying", "look at", "do not harm"`
+    : `- Single words only
+- Extract key words from phrases`;
 
-Here is ALL the text from the page (from OCR):
----
-${ocrText}
----
+  return `You are looking at a photo of a Hong Kong primary school English textbook page.
 
-YOUR TASK: Identify the KEY VOCABULARY WORDS that a student should learn from this page.
+YOUR TASK: Identify the KEY VOCABULARY WORDS that a student should learn for spelling practice.
 
 WHAT TO LOOK FOR:
 - Important nouns (things, animals, people, places)
-- Action verbs
-- Descriptive adjectives
-- Words that appear multiple times or seem emphasized
+- Action verbs (run, jump, fly, dance, sing)
+- Descriptive adjectives (happy, beautiful, little)
+- Words that appear in vocabulary lists or are emphasized in the textbook
 - Words suitable for primary school spelling practice (age 6-12)
 
 WHAT TO IGNORE:
 ❌ Common words: the, is, a, an, to, and, in, on, at, of, for, with, etc.
 ❌ Pronouns: I, you, he, she, it, we, they, my, your, etc.
 ❌ Question words: what, where, when, how, why
-❌ Page numbers, headers, instructions
+❌ Page numbers, headers, instructions, publisher names
 ❌ Chinese text
-❌ Single letters or OCR errors
+❌ Single letters
 
 OUTPUT RULES:
-- List only important vocabulary words (max 15-20 words)
-- One word per line
+${smartOutputFormat}
+- One item per line
 - No bullets, numbers, or explanations
+- Maximum 15-20 items
 - If no clear vocabulary words found, respond with: NO_WORDS_FOUND`;
 }
 
-// Call Google Cloud Vision API for OCR
-async function callGoogleVisionOCR(imageBase64: string, apiKey: string): Promise<{ text: string; error?: string }> {
-  try {
-    // Remove data URL prefix if present
-    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-
-    const requestBody = {
-      requests: [
-        {
-          image: {
-            content: base64Data,
-          },
-          features: [
-            {
-              type: 'TEXT_DETECTION',
-              maxResults: 1,
-            },
-          ],
-          imageContext: {
-            languageHints: ['en', 'zh'],
-          },
-        },
-      ],
-    };
-
-    console.log('[OCR] Calling Google Cloud Vision API...');
-
-    const response = await fetch(`${GOOGLE_VISION_API_URL}?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[OCR] Google Vision API error:', response.status, errorText);
-      return { text: '', error: `Google Vision API error: ${response.status}` };
-    }
-
-    const result = await response.json();
-
-    // Extract full text from response
-    const textAnnotations = result.responses?.[0]?.textAnnotations;
-    if (!textAnnotations || textAnnotations.length === 0) {
-      console.log('[OCR] No text found in image');
-      return { text: '', error: 'No text found in image' };
-    }
-
-    // First annotation contains the full text
-    const fullText = textAnnotations[0].description || '';
-    console.log('[OCR] Google Vision extracted text length:', fullText.length);
-
-    return { text: fullText };
-  } catch (error) {
-    console.error('[OCR] Google Vision API error:', error);
-    return { text: '', error: error instanceof Error ? error.message : 'Unknown error' };
-  }
-}
-
-// Call AI to analyze OCR text and identify vocabulary words
-async function callAIForVocabularyExtraction(
-  ocrText: string,
+// Call Gemini Vision to analyze the image directly
+async function callGeminiVision(
+  imageBase64: string,
   mode: string,
   highlightColors: string[] | undefined,
+  phraseMode: boolean,
   apiKey: string
 ): Promise<{ words: string[]; rawOutput: string; error?: string }> {
   try {
-    const prompt = buildHighlightAnalysisPrompt(ocrText, mode, highlightColors);
+    const prompt = buildVisionPrompt(mode, highlightColors, phraseMode);
 
-    console.log('[OCR] Calling AI for vocabulary extraction...');
+    console.log('[OCR] Calling Gemini Vision...');
+    console.log('[OCR] Mode:', mode, '| Phrase mode:', phraseMode);
 
+    // Prepare the image for Gemini (needs to be in the content array)
     const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
@@ -179,37 +117,48 @@ async function callAIForVocabularyExtraction(
         messages: [
           {
             role: 'user',
-            content: prompt,
+            content: [
+              {
+                type: 'text',
+                text: prompt,
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageBase64,
+                },
+              },
+            ],
           },
         ],
-        max_tokens: 500,
+        max_tokens: 800,
         temperature: 0,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[OCR] AI API error:', response.status, errorText);
-      return { words: [], rawOutput: '', error: `AI API error: ${response.status}` };
+      console.error('[OCR] Gemini Vision API error:', response.status, errorText);
+      return { words: [], rawOutput: '', error: `Gemini Vision API error: ${response.status}` };
     }
 
     const result = await response.json();
     const rawOutput = result.choices?.[0]?.message?.content || '';
 
-    console.log('[OCR] AI raw output:', rawOutput);
+    console.log('[OCR] Gemini Vision raw output:', rawOutput);
 
     // Parse the output
-    const words = parseAIOutput(rawOutput);
+    const words = parseAIOutput(rawOutput, phraseMode);
 
     return { words, rawOutput };
   } catch (error) {
-    console.error('[OCR] AI API error:', error);
+    console.error('[OCR] Gemini Vision API error:', error);
     return { words: [], rawOutput: '', error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
-// Parse AI output to extract words
-function parseAIOutput(text: string): string[] {
+// Parse AI output to extract words/phrases
+function parseAIOutput(text: string, phraseMode: boolean = false): string[] {
   const words: string[] = [];
   const seen = new Set<string>();
 
@@ -232,10 +181,10 @@ function parseAIOutput(text: string): string[] {
 
     if (!word || word.length < 2) continue;
 
-    // Must be English letters (allow spaces for phrases)
-    if (!/^[a-zA-Z\s]+$/.test(word)) continue;
+    // Must be English letters (allow spaces for phrases, allow apostrophes for contractions)
+    if (!/^[a-zA-Z\s']+$/.test(word)) continue;
 
-    // Skip common words that might slip through
+    // Skip if it's just common words (for single words only)
     const commonWords = new Set([
       'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
       'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
@@ -254,41 +203,41 @@ function parseAIOutput(text: string): string[] {
     ]);
 
     const wordLower = word.toLowerCase();
-    if (commonWords.has(wordLower)) continue;
+
+    // For single words, skip common words
+    // For phrases, allow them (phrases like "is flying" are OK)
+    if (!word.includes(' ') && commonWords.has(wordLower)) continue;
 
     // Normalize for deduplication
     const normalized = wordLower.replace(/\s+/g, ' ');
     if (seen.has(normalized)) continue;
     seen.add(normalized);
 
-    // Capitalize first letter
-    const cleaned = word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    // Format: capitalize first letter of each word
+    const cleaned = word
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
     words.push(cleaned);
   }
 
-  console.log('[OCR] Parsed vocabulary words:', words);
+  console.log('[OCR] Parsed vocabulary words/phrases:', words);
   return words;
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[OCR] ========== NEW OCR REQUEST ==========');
+  console.log('[OCR] API Version: Gemini 2.0 Flash Vision (v3)');
+
   try {
-    const { image, mode = 'smart', highlightColors } = await request.json();
+    const { image, mode = 'smart', highlightColors, phraseMode = false } = await request.json();
+    console.log('[OCR] Mode:', mode, '| Highlight colors:', highlightColors, '| Phrase mode:', phraseMode);
 
     if (!image) {
       return NextResponse.json({ error: 'Image is required' }, { status: 400 });
     }
 
-    // Check for Google Vision API key
-    const googleApiKey = process.env.GOOGLE_CLOUD_VISION_API_KEY;
     const openrouterApiKey = process.env.OPENROUTER_API_KEY;
-
-    if (!googleApiKey) {
-      console.error('[OCR] GOOGLE_CLOUD_VISION_API_KEY not configured');
-      return NextResponse.json(
-        { error: 'GOOGLE_CLOUD_VISION_API_KEY not configured', useLocalOCR: true },
-        { status: 500 }
-      );
-    }
 
     if (!openrouterApiKey) {
       console.error('[OCR] OPENROUTER_API_KEY not configured');
@@ -298,48 +247,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 1: Google Vision OCR
-    const ocrResult = await callGoogleVisionOCR(image, googleApiKey);
-
-    if (ocrResult.error || !ocrResult.text) {
-      return NextResponse.json({
-        success: false,
-        words: [],
-        highlightedWords: [],
-        rawText: ocrResult.error || 'No text found',
-        source: 'google-vision',
-        error: ocrResult.error,
-      });
-    }
-
-    // Step 2: AI vocabulary extraction
-    const aiResult = await callAIForVocabularyExtraction(
-      ocrResult.text,
+    // Call Gemini Vision directly with the image
+    const result = await callGeminiVision(
+      image,
       mode,
       highlightColors,
+      phraseMode,
       openrouterApiKey
     );
 
-    if (aiResult.error) {
-      // If AI fails, return raw OCR text for debugging
+    if (result.error) {
       return NextResponse.json({
         success: false,
         words: [],
         highlightedWords: [],
-        rawText: `[Google Vision OCR]\n${ocrResult.text}\n\n[AI Error]\n${aiResult.error}`,
-        source: 'google-vision',
-        error: aiResult.error,
+        rawText: `[Gemini Vision Error]\n${result.error}`,
+        source: 'gemini-vision',
+        error: result.error,
       });
     }
 
-    return NextResponse.json({
+    const finalResponse = {
       success: true,
-      words: aiResult.words,
-      highlightedWords: mode === 'highlighted' ? aiResult.words : [],
-      rawText: `[Google Vision OCR - ${ocrResult.text.length} chars]\n${ocrResult.text.substring(0, 500)}${ocrResult.text.length > 500 ? '...' : ''}\n\n[AI Vocabulary Extraction]\n${aiResult.rawOutput}`,
-      source: 'google-vision-ai',
+      words: result.words,
+      highlightedWords: mode === 'highlighted' ? result.words : [],
+      rawText: `[Gemini 2.0 Flash Vision - ${mode} mode${phraseMode ? ' (phrases)' : ''}]\n\n${result.rawOutput}`,
+      source: 'gemini-vision',
       modelUsed: AI_MODEL,
-    });
+    };
+
+    console.log('[OCR] ========== SUCCESS ==========');
+    console.log('[OCR] Words found:', result.words.length);
+    console.log('[OCR] Response source:', finalResponse.source);
+
+    return NextResponse.json(finalResponse);
   } catch (error) {
     console.error('[OCR] API error:', error);
     return NextResponse.json(
