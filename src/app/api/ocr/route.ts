@@ -3,12 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 // OpenRouter API endpoint (OpenAI-compatible)
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Gemini 2.0 Flash - Google's latest vision model with good highlight understanding
-// Using Gemini because OpenAI models may have issues with base64 images on OpenRouter
-const MODEL = 'google/gemini-2.0-flash-001';
+// Gemini 2.5 Flash - latest vision model with good highlight understanding
+const MODEL = 'google/gemini-2.5-flash';
 
 // Fallback model
-const FALLBACK_MODEL = 'google/gemini-2.5-flash-preview-05-20';
+const FALLBACK_MODEL = 'google/gemini-2.0-flash-001';
 
 // ===========================================
 // GPT-4o APPROACH: Strong visual understanding
@@ -114,7 +113,7 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildPrompt(mode, highlightColors);
 
-    console.log('[OCR] Calling Gemini 2.0 Flash with mode:', mode);
+    console.log('[OCR] Calling Gemini 2.5 Flash with mode:', mode);
 
     // Try GPT-4o first
     let response = await fetch(OPENROUTER_API_URL, {
@@ -154,8 +153,8 @@ export async function POST(request: NextRequest) {
 
     // If GPT-4o fails, try fallback
     if (!response.ok) {
-      fallbackReason = `Gemini 2.0 Flash failed with status ${response.status}`;
-      console.log('[OCR] Gemini 2.0 Flash failed, trying fallback model:', response.status);
+      fallbackReason = `Gemini 2.5 Flash failed with status ${response.status}`;
+      console.log('[OCR] Gemini 2.5 Flash failed, trying fallback model:', response.status);
       response = await fetch(OPENROUTER_API_URL, {
         method: 'POST',
         headers: {
@@ -211,7 +210,7 @@ export async function POST(request: NextRequest) {
         words: [],
         highlightedWords: [],
         rawText: rawOutput,
-        source: modelUsed === MODEL ? 'gemini2-ocr' : 'gemini-fallback-ocr',
+        source: modelUsed === MODEL ? 'gemini-ocr' : 'gemini-fallback-ocr',
         modelUsed,
         fallbackReason: fallbackReason || undefined,
       });
@@ -225,7 +224,7 @@ export async function POST(request: NextRequest) {
       words,
       highlightedWords,
       rawText: rawOutput,
-      source: modelUsed === MODEL ? 'gemini2-ocr' : 'gemini-fallback-ocr',
+      source: modelUsed === MODEL ? 'gemini-ocr' : 'gemini-fallback-ocr',
       modelUsed,
       fallbackReason: fallbackReason || undefined,
     });

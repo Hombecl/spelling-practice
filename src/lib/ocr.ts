@@ -190,14 +190,70 @@ function createHighlightMask(imageData: ImageData): boolean[][] {
   return mask;
 }
 
-// Convert File to base64 data URL
-async function fileToBase64(file: File): Promise<string> {
+// Resize image to max dimension while maintaining aspect ratio
+// Returns a compressed JPEG base64 data URL
+async function resizeImage(file: File, maxDimension: number = 1600, quality: number = 0.85): Promise<string> {
   return new Promise((resolve, reject) => {
+    const img = new Image();
     const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
+
+    reader.onload = (e) => {
+      img.src = e.target?.result as string;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
+
+    img.onload = () => {
+      let { width, height } = img;
+
+      // Calculate new dimensions
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
+      // Create canvas and draw resized image
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+
+      // Use better image smoothing for text
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to JPEG base64
+      const base64 = canvas.toDataURL('image/jpeg', quality);
+
+      // Log compression stats
+      const originalSize = file.size;
+      const compressedSize = Math.round((base64.length * 3) / 4); // Approximate base64 to bytes
+      console.log(`[OCR] Image resized: ${img.naturalWidth}x${img.naturalHeight} → ${width}x${height}`);
+      console.log(`[OCR] Size: ${(originalSize / 1024).toFixed(0)}KB → ~${(compressedSize / 1024).toFixed(0)}KB (${Math.round((compressedSize / originalSize) * 100)}%)`);
+
+      resolve(base64);
+    };
+
+    img.onerror = () => reject(new Error('Failed to load image'));
   });
+}
+
+// Convert File to base64 data URL (with resize for large images)
+async function fileToBase64(file: File): Promise<string> {
+  // Always resize to ensure consistent API behavior
+  // 1600px is enough for OCR and keeps file size manageable
+  return resizeImage(file, 1600, 0.85);
 }
 
 // Try Gemini OCR via our API route (OpenRouter)
