@@ -10,8 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Use Gemini 2.0 Flash for vision (better at following instructions than 2.5)
-const AI_MODEL = 'google/gemini-2.0-flash-001';
+// Use Gemini 3 Flash Preview for vision (most advanced, best at visual understanding)
+const AI_MODEL = 'google/gemini-3-flash-preview';
 
 // Build prompt for Gemini Vision to analyze the image directly
 function buildVisionPrompt(mode: string, highlightColors?: string[], phraseMode?: boolean): string {
@@ -35,24 +35,28 @@ function buildVisionPrompt(mode: string, highlightColors?: string[], phraseMode?
 - If a phrase is highlighted, extract the KEY WORD from it (e.g., from "is flying" extract "flying")`;
 
   if (mode === 'highlighted') {
-    return `You are looking at a photo of a Hong Kong primary school English textbook page.
+    return `You are a visual analyzer looking at a photo of an English textbook page.
 
-A student has used a ${colorDesc} HIGHLIGHTER PEN to mark words for spelling practice.
+CRITICAL TASK: Find text that has been physically marked with a ${colorDesc} HIGHLIGHTER PEN.
 
-YOUR TASK: Look at the image and identify ALL text that has been marked with highlighter.
+WHAT HIGHLIGHTER MARKS LOOK LIKE:
+- A semi-transparent colored stripe/band going THROUGH the text
+- The color (${colorDesc}) appears as a background behind the black text
+- Like someone used a real highlighter marker to draw over words
+- The highlight may be messy, uneven, or partially covering words
 
-HOW TO IDENTIFY HIGHLIGHTED TEXT:
-- Look for text with a colored background (${colorDesc})
-- Highlighter marks appear as semi-transparent colored overlay on text
-- The highlighting may not be perfect - look for any colored marking over text
+⚠️ IMPORTANT: Do NOT guess vocabulary words. Do NOT pick important-looking words.
+ONLY report words that VISUALLY have a colored highlighter mark on them.
 
-OUTPUT RULES:
+Look carefully at the image. If you see ${colorDesc} colored bands/stripes over any text, those are the highlighted words.
+
+OUTPUT FORMAT:
 ${outputFormat}
 - No bullets, numbers, or explanations
 - No Chinese text
-- If you cannot see any highlighted text, respond with: NO_WORDS_FOUND
+- ONLY words with visible highlighter marks
 
-IMPORTANT: Only output the highlighted words/phrases. Do not include any other text from the page.`;
+If you cannot see any ${colorDesc} highlighter marks on any text, respond with exactly: NO_WORDS_FOUND`;
   }
 
   // Smart mode - AI picks vocabulary
@@ -227,7 +231,7 @@ function parseAIOutput(text: string, phraseMode: boolean = false): string[] {
 
 export async function POST(request: NextRequest) {
   console.log('[OCR] ========== NEW OCR REQUEST ==========');
-  console.log('[OCR] API Version: Gemini 2.0 Flash Vision (v3)');
+  console.log('[OCR] API Version: Gemini 3 Flash Preview (v4)');
 
   try {
     const { image, mode = 'smart', highlightColors, phraseMode = false } = await request.json();
