@@ -32,34 +32,38 @@ function buildVisionPrompt(mode: string, highlightColors?: string[], phraseMode?
   if (mode === 'highlighted') {
     return `You are a visual analyzer looking at a photo of an English textbook page.
 
-CRITICAL TASK: Find ALL text that has been physically marked with a ${colorDesc} HIGHLIGHTER PEN.
+TASK: Analyze the image and provide TWO sections of output.
+
+=== SECTION 1: HIGHLIGHTED TEXT ===
+Find ALL text that has been physically marked with a ${colorDesc} HIGHLIGHTER PEN.
 
 WHAT HIGHLIGHTER MARKS LOOK LIKE:
 - A semi-transparent colored stripe/band going THROUGH the text
 - The color (${colorDesc}) appears as a background behind the black text
-- Like someone used a real highlighter marker to draw over words
 - The highlight may be messy, uneven, or partially covering words
 
-⚠️ VERY IMPORTANT RULES:
-1. Do NOT guess vocabulary words. ONLY report text with VISIBLE highlighter marks.
-2. PRESERVE PHRASES: If multiple words are highlighted together in ONE continuous mark, output them as ONE phrase.
-   - Example: If "beautiful flower" is highlighted with one stroke → output "beautiful flower"
-   - Example: If "thank you" is highlighted together → output "thank you"
-   - Example: If "food" and "drinks" are highlighted separately → output them as separate items
-3. Look for EACH separate highlighter stroke. Each stroke = one output line.
+RULES FOR HIGHLIGHTED TEXT:
+1. ONLY report text with VISIBLE highlighter marks
+2. PRESERVE PHRASES: If multiple words are highlighted together → output as ONE phrase
+3. Each separate highlighter stroke = one output line
+4. When in doubt, include it (better to include than miss)
 
-HOW TO DECIDE IF IT'S ONE PHRASE OR SEPARATE WORDS:
-- If the highlighter mark is ONE continuous band covering multiple words → ONE phrase
-- If there are separate/distinct highlighter marks on different words → separate items
-- When in doubt, preserve as phrase (better to keep together than split wrongly)
+=== SECTION 2: ALL VOCABULARY ===
+List ALL English vocabulary words/phrases visible on the page that could be useful for spelling practice.
+(This helps parents verify nothing was missed)
 
-OUTPUT FORMAT:
-- One highlighted item per line (can be single word OR phrase)
+OUTPUT FORMAT (use this exact format):
+---HIGHLIGHTED---
+[list highlighted words/phrases, one per line]
+---ALL_VOCABULARY---
+[list all vocabulary words/phrases, one per line]
+---END---
+
+RULES:
 - No bullets, numbers, or explanations
 - No Chinese text
-- Preserve the EXACT text that is highlighted
-
-If you cannot see any ${colorDesc} highlighter marks on any text, respond with exactly: NO_WORDS_FOUND`;
+- If no highlighted text found, write NO_WORDS_FOUND under ---HIGHLIGHTED---
+- Include names like "Henry", "Gloria", "The Fairies" if they appear highlighted`;
   }
 
   // Smart mode - AI picks vocabulary (preserve meaningful phrases)
@@ -98,7 +102,7 @@ async function callGeminiVision(
   highlightColors: string[] | undefined,
   phraseMode: boolean,
   apiKey: string
-): Promise<{ words: string[]; rawOutput: string; error?: string }> {
+): Promise<{ words: string[]; allVocabulary?: string[]; rawOutput: string; error?: string }> {
   try {
     const prompt = buildVisionPrompt(mode, highlightColors, phraseMode);
 
@@ -149,10 +153,10 @@ async function callGeminiVision(
 
     console.log('[OCR] Gemini Vision raw output:', rawOutput);
 
-    // Parse the output
-    const words = parseAIOutput(rawOutput, phraseMode);
+    // Parse the structured output
+    const { highlighted, allVocabulary } = parseStructuredOutput(rawOutput);
 
-    return { words, rawOutput };
+    return { words: highlighted, allVocabulary, rawOutput };
   } catch (error) {
     console.error('[OCR] Gemini Vision API error:', error);
     return { words: [], rawOutput: '', error: error instanceof Error ? error.message : 'Unknown error' };
@@ -173,13 +177,43 @@ const UNSPLITTABLE_PHRASES = new Set([
   'i am', 'you are', 'he is', 'she is', 'it is', 'we are', 'they are',
 ]);
 
-// Parse AI output to extract words/phrases
-function parseAIOutput(text: string, _phraseMode: boolean = false): string[] {
+// Parse the new structured AI output with sections
+function parseStructuredOutput(text: string): { highlighted: string[]; allVocabulary: string[] } {
+  const highlighted: string[] = [];
+  const allVocabulary: string[] = [];
+
+  // Check if it's the new structured format
+  if (text.includes('---HIGHLIGHTED---') && text.includes('---ALL_VOCABULARY---')) {
+    const highlightedMatch = text.match(/---HIGHLIGHTED---\s*([\s\S]*?)---ALL_VOCABULARY---/);
+    const allVocabMatch = text.match(/---ALL_VOCABULARY---\s*([\s\S]*?)(?:---END---|$)/);
+
+    if (highlightedMatch) {
+      const highlightedText = highlightedMatch[1].trim();
+      if (!highlightedText.includes('NO_WORDS_FOUND')) {
+        highlighted.push(...parseWordList(highlightedText));
+      }
+    }
+
+    if (allVocabMatch) {
+      const allVocabText = allVocabMatch[1].trim();
+      allVocabulary.push(...parseWordList(allVocabText));
+    }
+  } else {
+    // Fallback: treat entire output as highlighted words (old format)
+    if (!text.includes('NO_WORDS_FOUND')) {
+      highlighted.push(...parseWordList(text));
+    }
+  }
+
+  return { highlighted, allVocabulary };
+}
+
+// Parse a list of words/phrases from text
+function parseWordList(text: string): string[] {
   const words: string[] = [];
   const seen = new Set<string>();
 
-  // Check for no words found
-  if (text.includes('NO_WORDS_FOUND')) {
+  if (!text || text.includes('NO_WORDS_FOUND')) {
     return [];
   }
 
@@ -237,8 +271,14 @@ function parseAIOutput(text: string, _phraseMode: boolean = false): string[] {
     words.push(cleaned);
   }
 
-  console.log('[OCR] Parsed vocabulary words/phrases:', words);
+  console.log('[OCR] Parsed words/phrases:', words);
   return words;
+}
+
+// Legacy function for backward compatibility
+function parseAIOutput(text: string, _phraseMode: boolean = false): string[] {
+  const { highlighted } = parseStructuredOutput(text);
+  return highlighted;
 }
 
 export async function POST(request: NextRequest) {
@@ -290,12 +330,21 @@ export async function POST(request: NextRequest) {
       canSplit: word.includes(' ') && !UNSPLITTABLE_PHRASES.has(word.toLowerCase()),
     }));
 
+    // For highlighted mode, also include all vocabulary for parent to verify
+    const allVocabItems = (result.allVocabulary || []).map(word => ({
+      text: word,
+      isPhrase: word.includes(' '),
+      isHighlighted: result.words.some(hw => hw.toLowerCase() === word.toLowerCase()),
+    }));
+
     const finalResponse = {
       success: true,
       words: result.words,
-      items: items, // New: structured items with phrase info
+      items: items, // Structured items with phrase info
+      allVocabulary: result.allVocabulary || [], // All vocab for verification
+      allVocabItems: allVocabItems, // Structured with highlight status
       highlightedWords: mode === 'highlighted' ? result.words : [],
-      rawText: `[Gemini 3 Flash Vision - ${mode} mode]\n\n${result.rawOutput}`,
+      rawText: `[Gemini 3 Flash Vision - ${mode} mode]\n\nHighlighted: ${result.words.length} items\nAll vocabulary: ${(result.allVocabulary || []).length} items\n\n${result.rawOutput}`,
       source: 'gemini-vision',
       modelUsed: AI_MODEL,
     };
