@@ -32,7 +32,7 @@ export function getSpriteConfig(species: string, stage: PetStage): SpriteConfig 
     frameHeight: 170,
     columns: 3,
     rows: 3,
-    fps: 6, // Smooth idle animation speed
+    fps: 4, // Slower animation - sprites already have movement in frames
   };
 
   const path = `/pet/sprites/${species}-${stage}.png`;
