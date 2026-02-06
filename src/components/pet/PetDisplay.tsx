@@ -218,8 +218,6 @@ export default function PetDisplay({
     if (usesSprites) {
       if (mood === 'hungry') return 'sprite-pet-hungry';
       if (mood === 'sleepy') return 'sprite-pet-sleepy';
-      // Egg stage uses special wobble animation (static sprite + CSS wobble)
-      if (pet.stage === 'egg') return 'sprite-pet-egg';
       if (mood === 'happy') return 'sprite-pet-happy';
       return 'sprite-pet-idle';
     }
