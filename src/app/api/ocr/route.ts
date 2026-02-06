@@ -44,13 +44,12 @@ WHAT HIGHLIGHTER MARKS LOOK LIKE:
 
 RULES FOR HIGHLIGHTED TEXT:
 1. ONLY report text with VISIBLE highlighter marks
-2. PRESERVE PHRASES: If multiple words are highlighted together → output as ONE phrase
+2. If multiple words are highlighted together → output as ONE phrase (max 4-5 words)
 3. Each separate highlighter stroke = one output line
 4. When in doubt, include it (better to include than miss)
 
 === SECTION 2: ALL VOCABULARY ===
-List ALL English vocabulary words/phrases visible on the page that could be useful for spelling practice.
-(This helps parents verify nothing was missed)
+List English vocabulary words/phrases for spelling practice.
 
 OUTPUT FORMAT (use this exact format):
 ---HIGHLIGHTED---
@@ -59,11 +58,17 @@ OUTPUT FORMAT (use this exact format):
 [list all vocabulary words/phrases, one per line]
 ---END---
 
-RULES:
+CRITICAL RULES - MUST FOLLOW:
+✅ INCLUDE: Single words (flower, happy, dance)
+✅ INCLUDE: Short phrases 2-4 words (thank you, do not harm, little girl)
+✅ INCLUDE: Names (Henry, Gloria, The Fairies)
+❌ EXCLUDE: Full sentences (What are they doing? / Look at all these flowers and trees)
+❌ EXCLUDE: Questions (Why do the fairies...?)
+❌ EXCLUDE: Instructions (Tell your partner)
+❌ EXCLUDE: Single common words alone: is, are, the, a, an, to, and, in, on, at
+❌ EXCLUDE: Chinese text
 - No bullets, numbers, or explanations
-- No Chinese text
-- If no highlighted text found, write NO_WORDS_FOUND under ---HIGHLIGHTED---
-- Include names like "Henry", "Gloria", "The Fairies" if they appear highlighted`;
+- If no highlighted text found, write NO_WORDS_FOUND under ---HIGHLIGHTED---`;
   }
 
   // Smart mode - AI picks vocabulary (preserve meaningful phrases)
@@ -234,6 +239,13 @@ function parseWordList(text: string): string[] {
     // Must be English letters (allow spaces for phrases, allow apostrophes for contractions)
     if (!/^[a-zA-Z\s']+$/.test(word)) continue;
 
+    // Skip questions (ends with ?)
+    if (word.endsWith('?')) continue;
+
+    // Skip sentences that are too long (more than 5 words)
+    const wordCount = word.split(/\s+/).length;
+    if (wordCount > 5) continue;
+
     // Skip if it's just common words (for single words only)
     const commonWords = new Set([
       'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
@@ -250,6 +262,7 @@ function parseWordList(text: string): string[] {
       'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves',
       'what', 'which', 'who', 'whom', 'this', 'that', 'these', 'those',
       'am', 'if', 'no', 'yes', 'as', 'all', 'any', 'each', 'every',
+      'look', 'tell', 'say', 'ask', 'read', // Skip instruction verbs alone
     ]);
 
     const wordLower = word.toLowerCase();
@@ -257,6 +270,14 @@ function parseWordList(text: string): string[] {
     // For single words, skip common words
     // For phrases, allow them (phrases like "is flying" are OK)
     if (!word.includes(' ') && commonWords.has(wordLower)) continue;
+
+    // Skip instructional phrases
+    const instructionalPhrases = [
+      'tell your partner', 'read the', 'look at the', 'listen to the',
+      'what does', 'what do', 'why do', 'why does', 'how do', 'how does',
+      'do you', 'can you', 'will you', 'are you',
+    ];
+    if (instructionalPhrases.some(p => wordLower.startsWith(p))) continue;
 
     // Normalize for deduplication
     const normalized = wordLower.replace(/\s+/g, ' ');
@@ -344,9 +365,8 @@ export async function POST(request: NextRequest) {
       allVocabulary: result.allVocabulary || [], // All vocab for verification
       allVocabItems: allVocabItems, // Structured with highlight status
       highlightedWords: mode === 'highlighted' ? result.words : [],
-      rawText: `[Gemini 3 Flash Vision - ${mode} mode]\n\nHighlighted: ${result.words.length} items\nAll vocabulary: ${(result.allVocabulary || []).length} items\n\n${result.rawOutput}`,
+      rawText: '', // Don't expose raw AI output to frontend
       source: 'gemini-vision',
-      modelUsed: AI_MODEL,
     };
 
     console.log('[OCR] ========== SUCCESS ==========');

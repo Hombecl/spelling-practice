@@ -7,7 +7,14 @@
 
 export type PetStage = 'egg' | 'baby' | 'child' | 'teen' | 'adult';
 export type PetMood = 'happy' | 'content' | 'hungry' | 'sleepy';
-export type PetSpecies = 'slime' | 'unicorn' | 'dog';
+export type EvolutionRoute = 'scholar' | 'balanced' | 'speed';
+
+// Original species (legacy support)
+export type LegacyPetSpecies = 'slime' | 'unicorn' | 'dog';
+// New pixel pet types
+export type PixelPetType = 'pixel_unicorn' | 'pixel_dragon' | 'pixel_ghost_cat' | 'pixel_mecha_bird' | 'pixel_crystal_rabbit';
+// Combined type
+export type PetSpecies = LegacyPetSpecies | PixelPetType;
 
 // Species info for selection screen
 export interface PetSpeciesInfo {
@@ -18,9 +25,15 @@ export interface PetSpeciesInfo {
   color: string;            // Primary color for UI
   stageNames: Record<PetStage, string>;
   finalFormName: string;    // Name of adult form
+  isPixelPet?: boolean;     // True for new pixel art pets
+  element?: string;         // Element type for pixel pets
+  routeNames?: Record<EvolutionRoute, Record<'teen' | 'adult', string>>; // Names by evolution route
 }
 
 export const PET_SPECIES: Record<PetSpecies, PetSpeciesInfo> = {
+  // ============================================
+  // Legacy Pets (for backward compatibility)
+  // ============================================
   slime: {
     id: 'slime',
     nameZh: '史萊姆',
@@ -65,6 +78,120 @@ export const PET_SPECIES: Record<PetSpecies, PetSpeciesInfo> = {
       adult: '哮天犬',
     },
     finalFormName: '哮天犬',
+  },
+
+  // ============================================
+  // New Pixel Art Pets with Evolution Routes
+  // ============================================
+  pixel_unicorn: {
+    id: 'pixel_unicorn',
+    nameZh: '魔法獨角獸',
+    descriptionZh: '夢幻嘅魔法獨角獸，擁有治癒之力！進化路線會影響最終形態',
+    emoji: '🦄',
+    color: '#ec4899',
+    element: 'magic',
+    isPixelPet: true,
+    stageNames: {
+      egg: '魔法蛋',
+      baby: '小獨角',
+      child: '彩虹獸',
+      teen: '光輝獸', // Default to balanced
+      adult: '彩虹天馬',
+    },
+    finalFormName: '天馬',
+    routeNames: {
+      scholar: { teen: '賢者獸', adult: '天馬聖賢' },
+      balanced: { teen: '光輝獸', adult: '彩虹天馬' },
+      speed: { teen: '疾風獸', adult: '疾風天馬' },
+    },
+  },
+  pixel_dragon: {
+    id: 'pixel_dragon',
+    nameZh: '火焰龍',
+    descriptionZh: '熱情嘅火焰之龍，力量強大！進化路線會影響最終形態',
+    emoji: '🐉',
+    color: '#ef4444',
+    element: 'fire',
+    isPixelPet: true,
+    stageNames: {
+      egg: '火焰蛋',
+      baby: '小火龍',
+      child: '噴火獸',
+      teen: '炎龍',
+      adult: '帝王龍',
+    },
+    finalFormName: '帝王龍',
+    routeNames: {
+      scholar: { teen: '智火龍', adult: '古龍聖賢' },
+      balanced: { teen: '炎龍', adult: '帝王龍' },
+      speed: { teen: '閃焰龍', adult: '疾風火龍' },
+    },
+  },
+  pixel_ghost_cat: {
+    id: 'pixel_ghost_cat',
+    nameZh: '幽靈貓',
+    descriptionZh: '神秘嘅暗影之貓，可以隱身！進化路線會影響最終形態',
+    emoji: '🐱',
+    color: '#6366f1',
+    element: 'shadow',
+    isPixelPet: true,
+    stageNames: {
+      egg: '暗影蛋',
+      baby: '小幽靈',
+      child: '暗影貓',
+      teen: '幻影貓',
+      adult: '月光女神',
+    },
+    finalFormName: '月光女神',
+    routeNames: {
+      scholar: { teen: '智慧靈貓', adult: '九命聖靈' },
+      balanced: { teen: '幻影貓', adult: '月光女神' },
+      speed: { teen: '疾影貓', adult: '暗影霸王' },
+    },
+  },
+  pixel_mecha_bird: {
+    id: 'pixel_mecha_bird',
+    nameZh: '機械鳥',
+    descriptionZh: '高科技嘅機械鳥，翅膀可以發射激光！進化路線會影響最終形態',
+    emoji: '🤖',
+    color: '#06b6d4',
+    element: 'tech',
+    isPixelPet: true,
+    stageNames: {
+      egg: '電子蛋',
+      baby: '小機械',
+      child: '飛行機',
+      teen: '戰鬥機',
+      adult: '鋼鐵鳳凰',
+    },
+    finalFormName: '鳳凰',
+    routeNames: {
+      scholar: { teen: '智慧機', adult: '量子鳳凰' },
+      balanced: { teen: '戰鬥機', adult: '鋼鐵鳳凰' },
+      speed: { teen: '高速機', adult: '光速鳳凰' },
+    },
+  },
+  pixel_crystal_rabbit: {
+    id: 'pixel_crystal_rabbit',
+    nameZh: '水晶兔',
+    descriptionZh: '冰雪嘅水晶兔子，身體閃閃發光！進化路線會影響最終形態',
+    emoji: '🐰',
+    color: '#8b5cf6',
+    element: 'ice',
+    isPixelPet: true,
+    stageNames: {
+      egg: '水晶蛋',
+      baby: '小水晶',
+      child: '冰晶兔',
+      teen: '極光兔',
+      adult: '鑽石女王',
+    },
+    finalFormName: '月兔',
+    routeNames: {
+      scholar: { teen: '智慧冰兔', adult: '月光聖兔' },
+      balanced: { teen: '極光兔', adult: '鑽石女王' },
+      speed: { teen: '疾風冰兔', adult: '閃電兔王' },
+    },
   },
 };
 
@@ -134,6 +261,15 @@ export interface PetState {
   stage: PetStage;
   xp: number;
   level: number;
+
+  // Evolution route (for pixel pets at teen/adult stage)
+  evolutionRoute?: EvolutionRoute;
+  evolutionStats?: {
+    totalWords: number;
+    correctFirstTry: number;
+    practiceDays: number;
+    averageAccuracy: number;
+  };
 
   // Health/Happiness
   lastFedDate: string;     // ISO date - tracks daily practice
@@ -227,12 +363,70 @@ export const PET_STAGE_NAMES_ZH: Record<PetStage, string> = {
 };
 
 // Get species-specific stage name
-export function getPetStageName(species: PetSpecies, stage: PetStage): string {
-  return PET_SPECIES[species]?.stageNames[stage] || PET_STAGE_NAMES_ZH[stage];
+export function getPetStageName(species: PetSpecies, stage: PetStage, route?: EvolutionRoute): string {
+  const speciesInfo = PET_SPECIES[species];
+  if (!speciesInfo) return PET_STAGE_NAMES_ZH[stage];
+
+  // For pixel pets with evolution routes
+  if (speciesInfo.isPixelPet && route && speciesInfo.routeNames && (stage === 'teen' || stage === 'adult')) {
+    return speciesInfo.routeNames[route]?.[stage] || speciesInfo.stageNames[stage];
+  }
+
+  return speciesInfo.stageNames[stage] || PET_STAGE_NAMES_ZH[stage];
+}
+
+// Check if species is a pixel pet
+export function isPixelPet(species: PetSpecies): boolean {
+  return PET_SPECIES[species]?.isPixelPet === true;
+}
+
+// Determine evolution route based on accuracy
+export function determineEvolutionRoute(accuracy: number): EvolutionRoute {
+  if (accuracy >= 90) return 'scholar';
+  if (accuracy >= 70) return 'balanced';
+  return 'speed';
+}
+
+// Get evolution route description
+export function getEvolutionRouteInfo(route: EvolutionRoute): { nameZh: string; description: string; emoji: string; color: string } {
+  const info: Record<EvolutionRoute, { nameZh: string; description: string; emoji: string; color: string }> = {
+    scholar: {
+      nameZh: '學者路線',
+      description: '專注學習，準確率90%以上',
+      emoji: '📚',
+      color: '#3b82f6', // Blue
+    },
+    balanced: {
+      nameZh: '平衡路線',
+      description: '穩定發展，準確率70-90%',
+      emoji: '⚖️',
+      color: '#22c55e', // Green
+    },
+    speed: {
+      nameZh: '速度路線',
+      description: '快速練習，重視數量',
+      emoji: '⚡',
+      color: '#f59e0b', // Amber
+    },
+  };
+  return info[route];
 }
 
 // Get pet SVG path by species and stage
-export function getPetSvgPath(species: PetSpecies, stage: PetStage): string {
+export function getPetSvgPath(species: PetSpecies, stage: PetStage, route?: EvolutionRoute): string {
+  const speciesInfo = PET_SPECIES[species];
+
+  // For pixel pets with routes at teen/adult stage
+  if (speciesInfo?.isPixelPet && route && (stage === 'teen' || stage === 'adult')) {
+    return `/pet/sprites/${species}-${stage}-${route}.svg`;
+  }
+
+  // For pixel pets without routes (egg, baby, child)
+  if (speciesInfo?.isPixelPet) {
+    return `/pet/sprites/${species}-${stage}.svg`;
+  }
+
+  // Legacy pets
   return `/pet/${species}-${stage}.svg`;
 }
 
@@ -1018,9 +1212,16 @@ export function cleanupExpiredEffects(activeEffects: ActiveEffect[]): ActiveEffe
 
 // Default pet names by species
 export const DEFAULT_PET_NAMES: Record<PetSpecies, string> = {
+  // Legacy pets
   slime: '小綠綠',
   unicorn: '小彩虹',
   dog: '小旺旺',
+  // New pixel pets
+  pixel_unicorn: '小彩彩',
+  pixel_dragon: '小火火',
+  pixel_ghost_cat: '小幽幽',
+  pixel_mecha_bird: '小機機',
+  pixel_crystal_rabbit: '小晶晶',
 };
 
 /**

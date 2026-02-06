@@ -46,6 +46,11 @@ import {
   unequipItem,
   buyItem,
   getShopItems,
+  // Evolution system imports
+  isPixelPet,
+  determineEvolutionRoute,
+  PET_SPECIES,
+  EvolutionRoute,
 } from './pet';
 
 export interface WordProgress {
@@ -512,6 +517,8 @@ export interface EvolutionResult {
   evolved: boolean;
   oldStage: PetState['stage'];
   newStage: PetState['stage'];
+  evolutionRoute?: import('./pet').EvolutionRoute;
+  accuracy?: number;
 }
 
 /**
@@ -539,6 +546,24 @@ export function addXP(amount: number, progress: UserProgress): { progress: UserP
 
   // Check for evolution
   if (newStage !== oldStage) {
+    // For pixel pets evolving to teen or adult, determine evolution route
+    const speciesInfo = PET_SPECIES[updatedPet.species];
+    let evolutionRoute: EvolutionRoute | undefined = updatedPet.evolutionRoute;
+    let accuracy: number | undefined;
+
+    if (speciesInfo?.isPixelPet && (newStage === 'teen' || newStage === 'adult')) {
+      // Calculate accuracy from evolution stats
+      const stats = updatedPet.evolutionStats;
+      if (stats && stats.totalWords > 0) {
+        accuracy = (stats.correctFirstTry / stats.totalWords) * 100;
+        evolutionRoute = determineEvolutionRoute(accuracy);
+      } else {
+        // Default to balanced if no stats available
+        evolutionRoute = 'balanced';
+        accuracy = 80;
+      }
+    }
+
     updatedPet = {
       ...updatedPet,
       evolvedAt: {
@@ -547,8 +572,10 @@ export function addXP(amount: number, progress: UserProgress): { progress: UserP
       },
       // Unlock new skills
       unlockedSkills: getUnlockedSkills(newLevel).map(s => s.id),
+      // Set evolution route for pixel pets
+      ...(evolutionRoute ? { evolutionRoute } : {}),
     };
-    evolution = { evolved: true, oldStage, newStage };
+    evolution = { evolved: true, oldStage, newStage, evolutionRoute, accuracy };
   } else {
     // Check for new skill unlocks without evolution
     const unlockedSkills = getUnlockedSkills(newLevel).map(s => s.id);
@@ -569,6 +596,53 @@ export function addXP(amount: number, progress: UserProgress): { progress: UserP
       pet: updatedPet,
     },
     evolution,
+  };
+}
+
+/**
+ * Update evolution stats when completing a word
+ */
+export function updateEvolutionStats(
+  progress: UserProgress,
+  correct: boolean,
+  firstAttempt: boolean
+): UserProgress {
+  if (!progress.pet) return progress;
+
+  const currentStats = progress.pet.evolutionStats || {
+    totalWords: 0,
+    correctFirstTry: 0,
+    practiceDays: 0,
+    averageAccuracy: 0,
+  };
+
+  const newTotalWords = currentStats.totalWords + 1;
+  const newCorrectFirstTry = currentStats.correctFirstTry + (correct && firstAttempt ? 1 : 0);
+  const newAverageAccuracy = newTotalWords > 0
+    ? (newCorrectFirstTry / newTotalWords) * 100
+    : 0;
+
+  // Count unique practice days
+  const today = new Date().toISOString().split('T')[0];
+  const evolvedDates = Object.values(progress.pet.evolvedAt || {}).filter(Boolean);
+  const birthDate = progress.pet.birthDate?.split('T')[0];
+  const lastFedDate = progress.pet.lastFedDate;
+  const isNewDay = lastFedDate !== today;
+  const newPracticeDays = isNewDay
+    ? currentStats.practiceDays + 1
+    : currentStats.practiceDays;
+
+  return {
+    ...progress,
+    pet: {
+      ...progress.pet,
+      evolutionStats: {
+        totalWords: newTotalWords,
+        correctFirstTry: newCorrectFirstTry,
+        practiceDays: newPracticeDays,
+        averageAccuracy: Math.round(newAverageAccuracy * 10) / 10,
+      },
+    },
   };
 }
 
@@ -909,6 +983,7 @@ export type {
   PetState,
   PetStage,
   PetMood,
+  PetSpecies,
   FoodItem,
   DailyTask,
   InteractionResponse,
@@ -921,6 +996,10 @@ export type {
   ItemRarity,
   ItemCategory,
   EventType,
+  // Evolution system types
+  EvolutionRoute,
+  LegacyPetSpecies,
+  PixelPetType,
 } from './pet';
 export {
   calculateXP,
@@ -939,6 +1018,10 @@ export {
   getPetStageName,
   getPetSvgPath,
   DEFAULT_PET_NAMES,
+  // Evolution system exports
+  isPixelPet,
+  determineEvolutionRoute,
+  getEvolutionRouteInfo,
   // Interaction exports
   getPatResponse,
   canPatPet,

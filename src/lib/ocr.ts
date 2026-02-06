@@ -1,6 +1,13 @@
 // OCR utilities - supports Gemini Vision (via OpenRouter) with Tesseract.js fallback
 import Tesseract from 'tesseract.js';
 
+export interface OCRWordItem {
+  text: string;
+  isPhrase: boolean;
+  canSplit?: boolean;
+  isHighlighted?: boolean;
+}
+
 export interface OCRResult {
   success: boolean;
   words: string[];
@@ -8,9 +15,13 @@ export interface OCRResult {
   rawText: string;
   confidence: number;
   error?: string;
-  source?: 'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract';
+  source?: 'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | 'gemini-vision';
   modelUsed?: string;
   fallbackReason?: string;
+  // New fields for vocabulary comparison
+  items?: OCRWordItem[];
+  allVocabulary?: string[];
+  allVocabItems?: OCRWordItem[];
 }
 
 // Gemini OCR API response type
@@ -24,6 +35,10 @@ interface GeminiOCRResponse {
   useLocalOCR?: boolean;
   modelUsed?: string;
   fallbackReason?: string;
+  // New fields for vocabulary comparison
+  items?: OCRWordItem[];
+  allVocabulary?: string[];
+  allVocabItems?: OCRWordItem[];
 }
 
 // OCR scan options
@@ -315,6 +330,10 @@ async function tryGeminiOCR(
       source: data.source as OCRResult['source'] || 'gemini-ocr',
       modelUsed: data.modelUsed,
       fallbackReason: data.fallbackReason,
+      // Pass through vocabulary comparison fields
+      items: data.items,
+      allVocabulary: data.allVocabulary,
+      allVocabItems: data.allVocabItems,
     };
   } catch (error) {
     console.log('[OCR] Gemini OCR failed, falling back to Tesseract:', error);

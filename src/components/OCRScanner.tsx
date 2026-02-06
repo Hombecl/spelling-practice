@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { extractWordsFromImage, isValidEnglishWord } from '@/lib/ocr';
+import { extractWordsFromImage, isValidEnglishWord, OCRWordItem } from '@/lib/ocr';
 
 // Scan mode options
 type ScanMode = 'select' | 'highlighted' | 'smart';
 type HighlightColor = 'yellow' | 'pink' | 'green' | 'blue' | 'orange';
+type ViewMode = 'highlighted' | 'all' | 'comparison';
 
 interface OCRScannerProps {
   onWordsExtracted: (words: string[]) => void;
@@ -30,10 +31,12 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   const [highlightedWords, setHighlightedWords] = useState<Set<string>>(new Set());
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
-  const [filterMode, setFilterMode] = useState<'all' | 'highlighted'>('all');
-  const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | null>(null);
-  const [rawOutput, setRawOutput] = useState<string>(''); // Debug: show Gemini raw output
-  const [showDebug, setShowDebug] = useState(true); // Default open for debugging
+  const [viewMode, setViewMode] = useState<ViewMode>('highlighted');
+  const [ocrSource, setOcrSource] = useState<'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | 'gemini-vision' | null>(null);
+
+  // New: All vocabulary for comparison (in highlighted mode)
+  const [allVocabulary, setAllVocabulary] = useState<string[]>([]);
+  const [allVocabItems, setAllVocabItems] = useState<OCRWordItem[]>([]);
 
   const MAX_IMAGES = 3;
 
@@ -73,7 +76,9 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
 
     const allWords: string[] = [];
     const allHighlightedWords: string[] = [];
-    let lastSource: 'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | null = null;
+    const collectedAllVocab: string[] = [];
+    const collectedAllVocabItems: OCRWordItem[] = [];
+    let lastSource: 'gemini-ocr' | 'gemini2-ocr' | 'gemini-fallback-ocr' | 'tesseract' | 'gemini-vision' | null = null;
 
     // Pass scan options to OCR
     const colorsArray = Array.from(selectedColors);
@@ -100,12 +105,6 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
       );
 
       if (result.success) {
-        // Store raw output for debugging (include model info)
-        if (result.rawText) {
-          const debugInfo = result.modelUsed ? `[Model: ${result.modelUsed}]${result.fallbackReason ? ` (${result.fallbackReason})` : ''}\n\n` : '';
-          setRawOutput(prev => prev ? prev + '\n\n---IMAGE---\n\n' + debugInfo + result.rawText : debugInfo + result.rawText);
-        }
-
         // Filter to valid words and add to collection (avoid duplicates)
         const validWords = result.words.filter(isValidEnglishWord);
         const validHighlighted = result.highlightedWords.filter(isValidEnglishWord);
@@ -120,6 +119,23 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
             allHighlightedWords.push(word);
           }
         }
+
+        // Collect all vocabulary for comparison view
+        if (result.allVocabulary) {
+          for (const word of result.allVocabulary) {
+            if (!collectedAllVocab.includes(word) && isValidEnglishWord(word)) {
+              collectedAllVocab.push(word);
+            }
+          }
+        }
+        if (result.allVocabItems) {
+          for (const item of result.allVocabItems) {
+            if (!collectedAllVocabItems.some(i => i.text === item.text) && isValidEnglishWord(item.text)) {
+              collectedAllVocabItems.push(item);
+            }
+          }
+        }
+
         lastSource = result.source || null;
       }
     }
@@ -128,19 +144,20 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     setProcessingStatus('');
     setProgress(100);
 
-    if (allWords.length > 0) {
+    if (allWords.length > 0 || collectedAllVocab.length > 0) {
       setExtractedWords(allWords);
       setHighlightedWords(new Set(allHighlightedWords));
+      setAllVocabulary(collectedAllVocab);
+      setAllVocabItems(collectedAllVocabItems);
       setOcrSource(lastSource);
-      setRawOutput(prev => prev); // Keep raw output
 
       // If highlighted words found, select only those by default
       if (allHighlightedWords.length > 0) {
         setSelectedWords(new Set(allHighlightedWords));
-        setFilterMode('highlighted');
+        setViewMode('highlighted');
       } else {
         setSelectedWords(new Set(allWords));
-        setFilterMode('all');
+        setViewMode('all');
       }
     } else {
       setError('搵唔到英文字');
@@ -158,8 +175,10 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
   };
 
   const selectAll = () => {
-    const wordsToSelect = filterMode === 'highlighted'
-      ? extractedWords.filter(w => highlightedWords.has(w))
+    const wordsToSelect = viewMode === 'highlighted'
+      ? Array.from(highlightedWords)
+      : viewMode === 'all'
+      ? allVocabulary.length > 0 ? allVocabulary : extractedWords
       : extractedWords;
     setSelectedWords(new Set(wordsToSelect));
   };
@@ -170,16 +189,29 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
 
   const selectHighlightedOnly = () => {
     setSelectedWords(new Set(highlightedWords));
-    setFilterMode('highlighted');
+    setViewMode('highlighted');
   };
 
   const showAllWords = () => {
-    setFilterMode('all');
+    setViewMode('all');
   };
 
-  // Get words to display based on filter mode
-  const displayedWords = filterMode === 'highlighted'
-    ? extractedWords.filter(w => highlightedWords.has(w))
+  const showComparison = () => {
+    setViewMode('comparison');
+  };
+
+  // Add a word from all vocabulary to selected
+  const addWordFromAllVocab = (word: string) => {
+    const newSelected = new Set(selectedWords);
+    newSelected.add(word);
+    setSelectedWords(newSelected);
+  };
+
+  // Get words to display based on view mode
+  const displayedWords = viewMode === 'highlighted'
+    ? Array.from(highlightedWords)
+    : viewMode === 'all'
+    ? (allVocabulary.length > 0 ? allVocabulary : extractedWords)
     : extractedWords;
 
   const handleConfirm = () => {
@@ -204,12 +236,13 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
     setExtractedWords([]);
     setSelectedWords(new Set());
     setHighlightedWords(new Set());
+    setAllVocabulary([]);
+    setAllVocabItems([]);
     setError(null);
     setAnyColor(false);
     setSelectedColors(new Set(['yellow']));
     setProcessingStatus('');
-    setRawOutput('');
-    setShowDebug(false);
+    setViewMode('highlighted');
   };
 
   const toggleColor = (color: HighlightColor) => {
@@ -576,159 +609,199 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
           )}
 
           {/* Results */}
-          {images.length > 0 && extractedWords.length > 0 && !isProcessing && (
+          {images.length > 0 && (extractedWords.length > 0 || highlightedWords.size > 0 || allVocabulary.length > 0) && !isProcessing && (
             <div>
-              {/* Preview Images */}
-              <div className="mb-4">
-                {images.length === 1 ? (
-                  <img
-                    src={images[0].preview}
-                    alt="Uploaded"
-                    className="w-full h-32 object-cover rounded-xl"
-                  />
-                ) : (
-                  <div className="flex gap-2 overflow-x-auto pb-2">
-                    {images.map((img, idx) => (
-                      <div key={idx} className="flex-shrink-0 relative">
-                        <img
-                          src={img.preview}
-                          alt={`第${idx + 1}張`}
-                          className="h-24 w-auto rounded-lg object-cover"
-                        />
-                        <span className="absolute bottom-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
-                          {idx + 1}/{images.length}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              {/* Preview Images - Compact */}
+              <div className="mb-3">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {images.map((img, idx) => (
+                    <div key={idx} className="flex-shrink-0">
+                      <img
+                        src={img.preview}
+                        alt={`第${idx + 1}張`}
+                        className="h-16 w-auto rounded-lg object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Debug: Show raw Gemini output - FIRST for visibility */}
-              {rawOutput && (
-                <div className="mb-4 p-3 bg-purple-50 border border-purple-300 rounded-xl">
-                  <button
-                    onClick={() => setShowDebug(!showDebug)}
-                    className="text-sm text-purple-700 font-bold flex items-center gap-2"
-                  >
-                    🔍 {showDebug ? '收起' : '展開'} AI 原始輸出
-                  </button>
-                  {showDebug && (
-                    <div className="mt-2 p-2 bg-white rounded text-xs font-mono whitespace-pre-wrap max-h-60 overflow-y-auto border">
-                      {rawOutput || '(無輸出)'}
-                    </div>
-                  )}
+              {/* Result Summary */}
+              <div className="mb-3 p-3 bg-gradient-to-r from-yellow-50 to-green-50 border border-yellow-200 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-gray-800">
+                      {highlightedWords.size > 0 ? (
+                        <>🖍️ 偵測到 <span className="text-yellow-600">{highlightedWords.size}</span> 個標記嘅字</>
+                      ) : scanMode === 'smart' ? (
+                        <>🤖 揀咗 <span className="text-blue-600">{extractedWords.length}</span> 個適合練習嘅字</>
+                      ) : (
+                        <>📝 搵到 <span className="text-green-600">{extractedWords.length}</span> 個字</>
+                      )}
+                    </p>
+                    {allVocabulary.length > 0 && highlightedWords.size > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        頁面總共有 {allVocabulary.length} 個生字
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-2xl">
+                    {highlightedWords.size > 0 ? '✨' : '📚'}
+                  </div>
                 </div>
-              )}
+              </div>
 
-              {/* Highlight Detection Notice */}
-              {highlightedWords.size > 0 && (
-                <div className="mb-3 p-3 bg-yellow-50 border border-yellow-300 rounded-xl">
-                  <p className="text-sm text-yellow-800">
-                    🖍️ 偵測到 <span className="font-bold">{highlightedWords.size}</span> 個螢光筆標記嘅字！
-                  </p>
-                </div>
-              )}
-
-              {/* Smart mode notice */}
-              {scanMode === 'smart' && highlightedWords.size === 0 && (
-                <div className="mb-3 p-3 bg-blue-50 border border-blue-300 rounded-xl">
-                  <p className="text-sm text-blue-800">
-                    🤖 AI 揀咗 <span className="font-bold">{extractedWords.length}</span> 個適合練習嘅生字
-                  </p>
-                </div>
-              )}
-
-              {/* Filter Tabs */}
-              <div className="flex gap-2 mb-3">
-                <button
-                  onClick={showAllWords}
-                  className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
-                    filterMode === 'all'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  全部 ({extractedWords.length})
-                </button>
+              {/* View Mode Tabs */}
+              <div className="flex gap-1 mb-3 bg-gray-100 p-1 rounded-xl">
                 {highlightedWords.size > 0 && (
                   <button
                     onClick={selectHighlightedOnly}
-                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-all ${
-                      filterMode === 'highlighted'
-                        ? 'bg-yellow-500 text-white'
-                        : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${
+                      viewMode === 'highlighted'
+                        ? 'bg-yellow-500 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    🖍️ 標記咗 ({highlightedWords.size})
+                    🖍️ 標記 ({highlightedWords.size})
+                  </button>
+                )}
+                {allVocabulary.length > 0 && (
+                  <button
+                    onClick={showAllWords}
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${
+                      viewMode === 'all'
+                        ? 'bg-blue-500 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    📖 全部 ({allVocabulary.length})
+                  </button>
+                )}
+                {highlightedWords.size > 0 && allVocabulary.length > 0 && (
+                  <button
+                    onClick={showComparison}
+                    className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold transition-all ${
+                      viewMode === 'comparison'
+                        ? 'bg-purple-500 text-white shadow'
+                        : 'text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    🔍 對照
                   </button>
                 )}
               </div>
 
-              {/* Word Count */}
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-gray-600 text-sm">
-                  顯示緊 <span className="font-bold text-green-600">{displayedWords.length}</span> 個字
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={selectAll}
-                    className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
-                  >
-                    全選
-                  </button>
-                  <button
-                    onClick={selectNone}
-                    className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded"
-                  >
-                    取消
-                  </button>
+              {/* Comparison View */}
+              {viewMode === 'comparison' && (
+                <div className="space-y-3">
+                  {/* Highlighted Words */}
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-xl">
+                    <p className="text-sm font-bold text-yellow-800 mb-2">🖍️ 標記咗嘅字 ({highlightedWords.size})</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Array.from(highlightedWords).map((word) => (
+                        <button
+                          key={word}
+                          onClick={() => toggleWord(word)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                            selectedWords.has(word)
+                              ? 'bg-green-500 text-white'
+                              : 'bg-white border border-yellow-300 text-yellow-800'
+                          }`}
+                        >
+                          {word}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Other Vocabulary (not highlighted) */}
+                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                    <p className="text-sm font-bold text-gray-700 mb-2">📖 其他生字 ({allVocabulary.filter(w => !highlightedWords.has(w)).length})</p>
+                    <p className="text-xs text-gray-500 mb-2">撳可以加入練習</p>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                      {allVocabulary.filter(w => !highlightedWords.has(w)).map((word) => (
+                        <button
+                          key={word}
+                          onClick={() => addWordFromAllVocab(word)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                            selectedWords.has(word)
+                              ? 'bg-green-500 text-white'
+                              : 'bg-white border border-gray-300 text-gray-600 hover:border-green-400 hover:bg-green-50'
+                          }`}
+                        >
+                          {selectedWords.has(word) ? '✓ ' : '+ '}
+                          {word}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Word List */}
-              <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-xl">
-                {displayedWords.map((word) => (
-                  <button
-                    key={word}
-                    onClick={() => toggleWord(word)}
-                    className={`
-                      px-3 py-2 rounded-lg font-bold transition-all relative
-                      ${selectedWords.has(word)
-                        ? 'bg-green-500 text-white'
-                        : 'bg-white border-2 border-gray-300 text-gray-600'
-                      }
-                      ${highlightedWords.has(word) && !selectedWords.has(word)
-                        ? 'border-yellow-400 bg-yellow-50'
-                        : ''
-                      }
-                    `}
-                  >
-                    {highlightedWords.has(word) && (
-                      <span className="absolute -top-1 -right-1 text-xs">🖍️</span>
-                    )}
-                    {word}
-                  </button>
-                ))}
-              </div>
+              {/* Normal List View (highlighted or all) */}
+              {viewMode !== 'comparison' && (
+                <>
+                  {/* Word Count & Actions */}
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-gray-600 text-sm">
+                      顯示 <span className="font-bold text-green-600">{displayedWords.length}</span> 個字
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={selectAll}
+                        className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                      >
+                        全選
+                      </button>
+                      <button
+                        onClick={selectNone}
+                        className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Selected Count and OCR Source */}
+                  {/* Word List */}
+                  <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-xl">
+                    {displayedWords.map((word) => (
+                      <button
+                        key={word}
+                        onClick={() => toggleWord(word)}
+                        className={`
+                          px-3 py-2 rounded-lg font-bold transition-all relative
+                          ${selectedWords.has(word)
+                            ? 'bg-green-500 text-white'
+                            : 'bg-white border-2 border-gray-300 text-gray-600 hover:border-green-400'
+                          }
+                          ${highlightedWords.has(word) && !selectedWords.has(word)
+                            ? 'border-yellow-400 bg-yellow-50'
+                            : ''
+                          }
+                        `}
+                      >
+                        {highlightedWords.has(word) && viewMode === 'all' && (
+                          <span className="absolute -top-1 -right-1 text-xs">🖍️</span>
+                        )}
+                        {word}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Selected Count */}
               <div className="text-center mt-3">
-                <p className="text-sm text-gray-500">
-                  已選擇 {selectedWords.size} 個字
+                <p className="text-sm text-gray-600">
+                  已選擇 <span className="font-bold text-green-600">{selectedWords.size}</span> 個字
                 </p>
-                {ocrSource && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    {ocrSource === 'tesseract' ? '📝 本地 OCR' : '🤖 AI OCR'}
-                  </p>
-                )}
               </div>
 
             </div>
           )}
 
           {/* No words found */}
-          {images.length > 0 && extractedWords.length === 0 && !isProcessing && !error && (
+          {images.length > 0 && extractedWords.length === 0 && highlightedWords.size === 0 && allVocabulary.length === 0 && !isProcessing && !error && (
             <div className="text-center py-8">
               <div className="text-5xl mb-4">🤔</div>
               <p className="text-gray-600 font-bold mb-4">搵唔到英文字</p>
@@ -748,7 +821,7 @@ export default function OCRScanner({ onWordsExtracted, onClose }: OCRScannerProp
         </div>
 
         {/* Footer */}
-        {extractedWords.length > 0 && !isProcessing && (
+        {(extractedWords.length > 0 || highlightedWords.size > 0 || allVocabulary.length > 0) && !isProcessing && (
           <div className="p-4 border-t flex gap-3">
             <button
               onClick={resetToSelection}

@@ -2,18 +2,24 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { PetSpecies, PET_SPECIES, getPetSvgPath } from '@/lib/pet';
+import { PetSpecies, PET_SPECIES, getPetSvgPath, isPixelPet, EvolutionRoute, getEvolutionRouteInfo } from '@/lib/pet';
 
 interface PetSelectionProps {
   onSelect: (species: PetSpecies, name: string) => void;
 }
 
+// Separate pixel pets from legacy pets
+const PIXEL_PET_IDS: PetSpecies[] = ['pixel_unicorn', 'pixel_dragon', 'pixel_ghost_cat', 'pixel_mecha_bird', 'pixel_crystal_rabbit'];
+const LEGACY_PET_IDS: PetSpecies[] = ['slime', 'unicorn', 'dog'];
+
 export default function PetSelection({ onSelect }: PetSelectionProps) {
   const [selectedSpecies, setSelectedSpecies] = useState<PetSpecies | null>(null);
   const [petName, setPetName] = useState('');
   const [step, setStep] = useState<'choose' | 'name'>('choose');
+  const [showCategory, setShowCategory] = useState<'pixel' | 'legacy'>('pixel');
 
-  const speciesList = Object.values(PET_SPECIES);
+  const pixelPets = PIXEL_PET_IDS.map(id => PET_SPECIES[id]);
+  const legacyPets = LEGACY_PET_IDS.map(id => PET_SPECIES[id]);
 
   const handleSelectSpecies = (species: PetSpecies) => {
     setSelectedSpecies(species);
@@ -35,10 +41,12 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
 
   if (step === 'name' && selectedSpecies) {
     const speciesInfo = PET_SPECIES[selectedSpecies];
+    const isPixel = isPixelPet(selectedSpecies);
+    const routes: EvolutionRoute[] = ['scholar', 'balanced', 'speed'];
 
     return (
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 max-h-[90vh] overflow-y-auto">
           {/* Back button */}
           <button
             onClick={handleBack}
@@ -49,7 +57,10 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
 
           {/* Selected pet preview */}
           <div className="flex flex-col items-center mb-6">
-            <div className="w-40 h-40 relative flex items-center justify-center rounded-2xl bg-gradient-to-b from-white to-gray-100 shadow-lg overflow-hidden pet-egg">
+            <div
+              className="w-40 h-40 relative flex items-center justify-center rounded-2xl shadow-lg overflow-hidden pet-egg"
+              style={{ background: `linear-gradient(to bottom, white, ${speciesInfo.color}15)` }}
+            >
               <Image
                 src={getPetSvgPath(selectedSpecies, 'egg')}
                 alt={speciesInfo.nameZh}
@@ -64,6 +75,9 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
               <h3 className="text-xl font-bold" style={{ color: speciesInfo.color }}>
                 {speciesInfo.nameZh}
               </h3>
+              {isPixel && speciesInfo.element && (
+                <span className="text-xs text-gray-500">元素：{speciesInfo.element}</span>
+              )}
             </div>
           </div>
 
@@ -84,7 +98,7 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
           </div>
 
           {/* Evolution preview */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-xl">
+          <div className="mb-4 p-4 bg-gray-50 rounded-xl">
             <p className="text-sm text-gray-600 mb-3 text-center">進化預覽</p>
             <div className="flex justify-center gap-2 overflow-x-auto pb-2">
               {(['egg', 'baby', 'child', 'teen', 'adult'] as const).map((stage, idx) => (
@@ -108,10 +122,48 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
             </div>
           </div>
 
+          {/* Evolution routes preview (only for pixel pets) */}
+          {isPixel && speciesInfo.routeNames && (
+            <div className="mb-6 p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl">
+              <p className="text-sm font-medium text-gray-700 mb-3 text-center">
+                🌟 進化路線（由準確率決定）
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {routes.map(route => {
+                  const routeInfo = getEvolutionRouteInfo(route);
+                  const routeNames = speciesInfo.routeNames?.[route];
+                  return (
+                    <div
+                      key={route}
+                      className="text-center p-2 bg-white rounded-lg shadow-sm"
+                    >
+                      <div className="text-2xl mb-1">{routeInfo.emoji}</div>
+                      <div className="text-xs font-bold" style={{ color: routeInfo.color }}>
+                        {routeInfo.nameZh}
+                      </div>
+                      {routeNames && (
+                        <div className="text-[10px] text-gray-500 mt-1">
+                          {routeNames.adult}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-gray-400 text-center mt-2">
+                準確率90%+ = 學者 | 70-90% = 平衡 | 70%- = 速度
+              </p>
+            </div>
+          )}
+
           {/* Final form highlight */}
           <div className="mb-6 p-3 rounded-xl text-center" style={{ backgroundColor: `${speciesInfo.color}15` }}>
             <p className="text-sm text-gray-600">
-              最終形態：<span className="font-bold" style={{ color: speciesInfo.color }}>{speciesInfo.finalFormName}</span>
+              {isPixel ? (
+                <>進化路線會影響最終形態！</>
+              ) : (
+                <>最終形態：<span className="font-bold" style={{ color: speciesInfo.color }}>{speciesInfo.finalFormName}</span></>
+              )}
             </p>
           </div>
 
@@ -130,9 +182,9 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 flex flex-col items-center justify-center p-6">
-      <div className="max-w-lg w-full">
+      <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto">
         {/* Title */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-2">
             歡迎嚟到串字練習！
           </h1>
@@ -141,9 +193,45 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
           </p>
         </div>
 
+        {/* Category tabs */}
+        <div className="flex gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
+          <button
+            onClick={() => setShowCategory('pixel')}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+              showCategory === 'pixel'
+                ? 'bg-white shadow text-purple-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            ✨ 新像素寵物
+          </button>
+          <button
+            onClick={() => setShowCategory('legacy')}
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+              showCategory === 'legacy'
+                ? 'bg-white shadow text-purple-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🎮 經典寵物
+          </button>
+        </div>
+
+        {/* Pixel pets info banner */}
+        {showCategory === 'pixel' && (
+          <div className="mb-4 p-3 bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl text-center">
+            <p className="text-sm text-purple-700">
+              🌟 像素寵物有<strong>進化路線系統</strong>！
+            </p>
+            <p className="text-xs text-purple-500 mt-1">
+              準確率會影響進化方向：學者 / 平衡 / 速度
+            </p>
+          </div>
+        )}
+
         {/* Pet selection grid */}
         <div className="grid grid-cols-1 gap-4">
-          {speciesList.map((species) => (
+          {(showCategory === 'pixel' ? pixelPets : legacyPets).map((species) => (
             <button
               key={species.id}
               onClick={() => handleSelectSpecies(species.id)}
@@ -171,15 +259,35 @@ export default function PetSelection({ onSelect }: PetSelectionProps) {
                   <h3 className="text-xl font-bold" style={{ color: species.color }}>
                     {species.nameZh}
                   </h3>
+                  {species.isPixelPet && (
+                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 rounded-full">
+                      進化路線
+                    </span>
+                  )}
                 </div>
-                <p className="text-sm text-gray-600 mb-2">
+                <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                   {species.descriptionZh}
                 </p>
                 <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <span>最終形態：</span>
-                  <span className="font-medium" style={{ color: species.color }}>
-                    {species.finalFormName}
-                  </span>
+                  {species.element && (
+                    <>
+                      <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
+                        {species.element === 'magic' && '✨ 魔法'}
+                        {species.element === 'fire' && '🔥 火焰'}
+                        {species.element === 'shadow' && '🌙 暗影'}
+                        {species.element === 'tech' && '⚡ 科技'}
+                        {species.element === 'ice' && '❄️ 冰雪'}
+                      </span>
+                    </>
+                  )}
+                  {!species.isPixelPet && (
+                    <>
+                      <span>最終形態：</span>
+                      <span className="font-medium" style={{ color: species.color }}>
+                        {species.finalFormName}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 

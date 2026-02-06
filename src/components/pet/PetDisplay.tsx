@@ -2,13 +2,33 @@
 
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
-import { PetState, PetStage, PetMood, PetSpecies, getPetMood, getPetStageName, getPetSvgPath, PET_SPECIES } from '@/lib/pet';
+import {
+  PetState,
+  PetStage,
+  PetMood,
+  PetSpecies,
+  EvolutionRoute,
+  getPetMood,
+  getPetStageName,
+  getPetSvgPath,
+  PET_SPECIES,
+  isPixelPet,
+} from '@/lib/pet';
+import { hasSpriteSheet, getSpriteConfig } from '@/lib/spriteConfig';
+import SpriteAnimation from './SpriteAnimation';
 
 // Fallback emoji by species and stage
-const FALLBACK_EMOJIS: Record<PetSpecies, Record<PetStage, string>> = {
+const FALLBACK_EMOJIS: Record<string, Record<PetStage, string>> = {
+  // Legacy pets
   slime: { egg: '🥚', baby: '🟢', child: '🟩', teen: '💚', adult: '👑' },
   unicorn: { egg: '🥚', baby: '🦄', child: '🌸', teen: '💜', adult: '🪽' },
   dog: { egg: '🥚', baby: '🐕', child: '🐕‍🦺', teen: '🐺', adult: '🔥' },
+  // New pixel pets
+  pixel_unicorn: { egg: '🥚', baby: '🦄', child: '🌈', teen: '✨', adult: '🌟' },
+  pixel_dragon: { egg: '🥚', baby: '🔥', child: '🐲', teen: '🌋', adult: '🐉' },
+  pixel_ghost_cat: { egg: '🥚', baby: '👻', child: '🌙', teen: '🔮', adult: '🌕' },
+  pixel_mecha_bird: { egg: '🥚', baby: '🐤', child: '✈️', teen: '🤖', adult: '🦅' },
+  pixel_crystal_rabbit: { egg: '🥚', baby: '💎', child: '❄️', teen: '🌈', adult: '👑' },
 };
 
 // Pixel art stage-specific animation classes (base bounce/float)
@@ -32,7 +52,8 @@ const MOOD_ANIMATIONS: Record<PetMood, string> = {
 };
 
 // Background glow colors by species
-const SPECIES_GLOW_COLORS: Record<PetSpecies, Record<PetStage, string>> = {
+const SPECIES_GLOW_COLORS: Record<string, Record<PetStage, string>> = {
+  // Legacy pets
   slime: {
     egg: 'from-green-100 to-emerald-100',
     baby: 'from-green-100 to-emerald-100',
@@ -54,6 +75,58 @@ const SPECIES_GLOW_COLORS: Record<PetSpecies, Record<PetStage, string>> = {
     teen: 'from-orange-100 to-red-100',
     adult: 'from-orange-200 to-red-100',
   },
+  // New pixel pets
+  pixel_unicorn: {
+    egg: 'from-pink-100 to-fuchsia-100',
+    baby: 'from-pink-100 to-fuchsia-100',
+    child: 'from-fuchsia-100 to-purple-100',
+    teen: 'from-purple-100 to-violet-100',
+    adult: 'from-violet-200 to-fuchsia-100',
+  },
+  pixel_dragon: {
+    egg: 'from-red-100 to-orange-100',
+    baby: 'from-red-100 to-orange-100',
+    child: 'from-orange-100 to-amber-100',
+    teen: 'from-red-100 to-rose-100',
+    adult: 'from-red-200 to-orange-100',
+  },
+  pixel_ghost_cat: {
+    egg: 'from-indigo-100 to-purple-100',
+    baby: 'from-indigo-100 to-purple-100',
+    child: 'from-violet-100 to-indigo-100',
+    teen: 'from-indigo-100 to-blue-100',
+    adult: 'from-indigo-200 to-violet-100',
+  },
+  pixel_mecha_bird: {
+    egg: 'from-cyan-100 to-teal-100',
+    baby: 'from-cyan-100 to-teal-100',
+    child: 'from-teal-100 to-emerald-100',
+    teen: 'from-cyan-100 to-sky-100',
+    adult: 'from-cyan-200 to-teal-100',
+  },
+  pixel_crystal_rabbit: {
+    egg: 'from-violet-100 to-purple-100',
+    baby: 'from-violet-100 to-purple-100',
+    child: 'from-purple-100 to-fuchsia-100',
+    teen: 'from-violet-100 to-indigo-100',
+    adult: 'from-violet-200 to-purple-100',
+  },
+};
+
+// Element-based animation classes for pixel pets
+const ELEMENT_ANIMATIONS: Record<string, string> = {
+  magic: 'animate-balanced-rainbow',
+  fire: 'animate-fire-flicker',
+  shadow: 'animate-shadow-phase',
+  tech: 'animate-tech-scan',
+  ice: 'animate-ice-shimmer',
+};
+
+// Route-based animation modifiers
+const ROUTE_ANIMATIONS: Record<EvolutionRoute, { idle: string; happy: string }> = {
+  scholar: { idle: 'animate-scholar-glow', happy: 'animate-float' },
+  balanced: { idle: 'animate-glow-float', happy: 'animate-balanced-rainbow' },
+  speed: { idle: 'animate-fast-float', happy: 'animate-fast-sway' },
 };
 
 interface PetDisplayProps {
@@ -131,11 +204,37 @@ export default function PetDisplay({
     sleepy: '好攰...',
   };
 
-  // Get animation class based on mood
+  // Get animation class based on mood, species, and evolution route
   const getAnimationClass = () => {
+    // Mood overrides for all pets
     if (mood === 'hungry' || mood === 'sleepy') {
       return MOOD_ANIMATIONS[mood];
     }
+
+    const speciesInfo = PET_SPECIES[species];
+
+    // For pixel pets with evolution routes
+    if (speciesInfo?.isPixelPet && pet.evolutionRoute && (pet.stage === 'teen' || pet.stage === 'adult')) {
+      const routeAnim = ROUTE_ANIMATIONS[pet.evolutionRoute];
+      if (mood === 'happy') {
+        return routeAnim.happy;
+      }
+      return routeAnim.idle;
+    }
+
+    // For pixel pets without routes or at earlier stages
+    if (speciesInfo?.isPixelPet && speciesInfo.element) {
+      const elementAnim = ELEMENT_ANIMATIONS[speciesInfo.element];
+      if (mood === 'happy') {
+        return 'animate-pixel-bounce';
+      }
+      // Use element animation for adult/teen, stage animation for others
+      if (pet.stage === 'teen' || pet.stage === 'adult') {
+        return elementAnim || STAGE_ANIMATIONS[pet.stage];
+      }
+    }
+
+    // Default behavior for legacy pets
     if (mood === 'happy') {
       return MOOD_ANIMATIONS.happy;
     }
@@ -145,8 +244,15 @@ export default function PetDisplay({
   // Get glow color based on species
   const glowColor = SPECIES_GLOW_COLORS[species]?.[pet.stage] || 'from-gray-100 to-gray-100';
 
-  // Get pet image path
-  const imagePath = getPetSvgPath(species, pet.stage);
+  // Get pet image path (include route for pixel pets at teen/adult stage)
+  const imagePath = getPetSvgPath(species, pet.stage, pet.evolutionRoute);
+
+  // Get element class for pixel pets
+  const speciesInfo = PET_SPECIES[species];
+  const elementClass = speciesInfo?.isPixelPet && speciesInfo?.element
+    ? `element-${speciesInfo.element}`
+    : '';
+  const routeClass = pet.evolutionRoute ? `route-${pet.evolutionRoute}` : '';
 
   return (
     <div
@@ -168,6 +274,8 @@ export default function PetDisplay({
           ${mood === 'hungry' || mood === 'sleepy' ? 'opacity-80' : ''}
           overflow-hidden
           pet-3d-container
+          ${elementClass}
+          ${routeClass}
         `}
       >
         {/* Pixel grid background pattern */}
@@ -193,29 +301,53 @@ export default function PetDisplay({
           `}
           style={{ transformStyle: 'preserve-3d' }}
         >
-          <Image
-            src={imagePath}
-            alt={`${pet.name} - ${getPetStageName(species, pet.stage)}`}
-            width={config.imageSize}
-            height={config.imageSize}
-            className="w-full h-full object-contain pixel-art"
-            style={{
-              imageRendering: 'pixelated',
-            }}
-            priority
-            onError={(e) => {
-              // Fallback to emoji
-              const target = e.target as HTMLImageElement;
-              target.style.display = 'none';
-              const parent = target.parentElement;
-              if (parent) {
-                const emoji = document.createElement('span');
-                emoji.className = `${config.emoji}`;
-                emoji.textContent = FALLBACK_EMOJIS[species]?.[pet.stage] || '🥚';
-                parent.appendChild(emoji);
+          {/* Use SpriteAnimation for species with sprite sheets */}
+          {hasSpriteSheet(species) ? (
+            (() => {
+              const spriteConfig = getSpriteConfig(species, pet.stage);
+              if (spriteConfig) {
+                // Calculate scale based on container size
+                const scale = config.imageSize / spriteConfig.frameWidth;
+                return (
+                  <SpriteAnimation
+                    spriteSheet={spriteConfig.path}
+                    frameWidth={spriteConfig.frameWidth}
+                    frameHeight={spriteConfig.frameHeight}
+                    columns={spriteConfig.columns}
+                    rows={spriteConfig.rows}
+                    fps={spriteConfig.fps}
+                    scale={scale}
+                    className="pixel-art"
+                  />
+                );
               }
-            }}
-          />
+              return null;
+            })()
+          ) : (
+            <Image
+              src={imagePath}
+              alt={`${pet.name} - ${getPetStageName(species, pet.stage)}`}
+              width={config.imageSize}
+              height={config.imageSize}
+              className="w-full h-full object-contain pixel-art"
+              style={{
+                imageRendering: 'pixelated',
+              }}
+              priority
+              onError={(e) => {
+                // Fallback to emoji
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  const emoji = document.createElement('span');
+                  emoji.className = `${config.emoji}`;
+                  emoji.textContent = FALLBACK_EMOJIS[species]?.[pet.stage] || '🥚';
+                  parent.appendChild(emoji);
+                }
+              }}
+            />
+          )}
         </div>
 
         {/* Happiness Hearts */}
@@ -248,8 +380,20 @@ export default function PetDisplay({
             {pet.name}
           </div>
           <div className="text-xs text-gray-500">
-            Lv.{pet.level} {getPetStageName(species, pet.stage)}
+            Lv.{pet.level} {getPetStageName(species, pet.stage, pet.evolutionRoute)}
           </div>
+          {/* Show evolution route badge for pixel pets */}
+          {speciesInfo?.isPixelPet && pet.evolutionRoute && (pet.stage === 'teen' || pet.stage === 'adult') && (
+            <div className={`mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
+              ${pet.evolutionRoute === 'scholar' ? 'bg-blue-100 text-blue-700' : ''}
+              ${pet.evolutionRoute === 'balanced' ? 'bg-green-100 text-green-700' : ''}
+              ${pet.evolutionRoute === 'speed' ? 'bg-amber-100 text-amber-700' : ''}
+            `}>
+              {pet.evolutionRoute === 'scholar' && '📚 學者'}
+              {pet.evolutionRoute === 'balanced' && '⚖️ 平衡'}
+              {pet.evolutionRoute === 'speed' && '⚡ 速度'}
+            </div>
+          )}
         </div>
       )}
 
