@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { PetStage, PET_STAGE_NAMES_ZH } from '@/lib/progress';
-import { PetState } from '@/lib/pet';
+import { PetState, PetSpecies } from '@/lib/pet';
 import PetDisplay from '@/components/pet/PetDisplay';
 
 const TEST_PASSWORD = '123';
@@ -26,7 +26,7 @@ export default function TestPage() {
 
   // Test pet states for each stage
   const [currentStage, setCurrentStage] = useState<PetStage>('egg');
-  const [currentSpecies, setCurrentSpecies] = useState<string>('pixel_unicorn');
+  const [currentSpecies, setCurrentSpecies] = useState<PetSpecies>('pixel_unicorn');
   const [happiness, setHappiness] = useState(80);
   const [level, setLevel] = useState(1);
 
@@ -187,7 +187,7 @@ export default function TestPage() {
             {TEST_SPECIES.map((species) => (
               <button
                 key={species.id}
-                onClick={() => setCurrentSpecies(species.id)}
+                onClick={() => setCurrentSpecies(species.id as PetSpecies)}
                 className={`p-3 rounded-xl text-center transition-all ${
                   currentSpecies === species.id
                     ? 'bg-purple-500 text-white'
