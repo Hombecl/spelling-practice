@@ -452,8 +452,25 @@ body {
   }
 }
 
+/* Gentle egg wobble - for static egg sprites */
+@keyframes sprite-egg-wobble {
+  0%, 100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  25% {
+    transform: rotate(-3deg) translateY(-1px);
+  }
+  75% {
+    transform: rotate(3deg) translateY(-1px);
+  }
+}
+
 .sprite-pet-idle {
   animation: sprite-subtle-idle 2s ease-in-out infinite;
+}
+
+.sprite-pet-egg {
+  animation: sprite-egg-wobble 1.5s ease-in-out infinite;
 }
 
 .sprite-pet-happy {
