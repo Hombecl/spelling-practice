@@ -151,7 +151,12 @@ export default function PetDisplay({
   const [turnAnimation, setTurnAnimation] = useState<string>('');
 
   // Randomly trigger 3D turn animations for more lifelike feel
+  // Skip for sprite pets since they already have internal animation
+  const shouldAnimateTurns = !hasSpriteSheet(species);
+
   useEffect(() => {
+    // Skip turn animations for sprite pets
+    if (!shouldAnimateTurns) return;
     // Only animate when pet is happy or content (not hungry/sleepy)
     if (mood === 'hungry' || mood === 'sleepy') return;
 
@@ -178,7 +183,7 @@ export default function PetDisplay({
       clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, [mood]);
+  }, [mood, shouldAnimateTurns]);
 
   // Size configurations - larger for pixel art visibility
   const sizeConfig = {
@@ -204,8 +209,19 @@ export default function PetDisplay({
     sleepy: '好攰...',
   };
 
+  // Check if this species uses sprite sheets (which have internal animation)
+  const usesSprites = hasSpriteSheet(species);
+
   // Get animation class based on mood, species, and evolution route
   const getAnimationClass = () => {
+    // For sprite pets, use subtle animations since sprites already animate
+    if (usesSprites) {
+      if (mood === 'hungry') return 'sprite-pet-hungry';
+      if (mood === 'sleepy') return 'sprite-pet-sleepy';
+      if (mood === 'happy') return 'sprite-pet-happy';
+      return 'sprite-pet-idle';
+    }
+
     // Mood overrides for all pets
     if (mood === 'hungry' || mood === 'sleepy') {
       return MOOD_ANIMATIONS[mood];

@@ -431,6 +431,41 @@ body {
   animation: slime-king 2.5s ease-in-out infinite;
 }
 
+/* ========== Subtle animations for sprite pets ========== */
+/* Since sprite sheets already have internal animation, use minimal CSS animation */
+
+@keyframes sprite-subtle-idle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes sprite-subtle-bounce {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.02);
+  }
+}
+
+.sprite-pet-idle {
+  animation: sprite-subtle-idle 2s ease-in-out infinite;
+}
+
+.sprite-pet-happy {
+  animation: sprite-subtle-bounce 1.5s ease-in-out infinite;
+}
+
+.sprite-pet-hungry,
+.sprite-pet-sleepy {
+  animation: none;
+  opacity: 0.85;
+}
+
 /* ========== 3D Turn Animations for depth ========== */
 /* Makes pets feel more alive with left-right turning */
 
