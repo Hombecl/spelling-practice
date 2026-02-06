@@ -27,6 +27,7 @@ export default function SpriteAnimation({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const totalFrames = columns * rows;
   const displayWidth = frameWidth * scale;
@@ -35,14 +36,16 @@ export default function SpriteAnimation({
   // Load the sprite sheet image
   useEffect(() => {
     const img = new Image();
-    img.src = spriteSheet;
+    img.crossOrigin = 'anonymous'; // Allow canvas to use the image
     img.onload = () => {
       imageRef.current = img;
       setImageLoaded(true);
     };
-    img.onerror = () => {
-      console.error('Failed to load sprite sheet:', spriteSheet);
+    img.onerror = (e) => {
+      console.error('Failed to load sprite sheet:', spriteSheet, e);
+      setLoadError(true);
     };
+    img.src = spriteSheet; // Set src after event handlers
   }, [spriteSheet]);
 
   // Animation loop
@@ -83,6 +86,19 @@ export default function SpriteAnimation({
     );
   }, [currentFrame, imageLoaded, frameWidth, frameHeight, columns, displayWidth, displayHeight]);
 
+  // Show error state if image failed to load
+  if (loadError) {
+    return (
+      <div
+        className={`flex items-center justify-center ${className}`}
+        style={{ width: displayWidth, height: displayHeight }}
+      >
+        <span className="text-4xl">🐾</span>
+      </div>
+    );
+  }
+
+  // Show loading state
   if (!imageLoaded) {
     return (
       <div
