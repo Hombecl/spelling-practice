@@ -9,6 +9,16 @@ const TEST_PASSWORD = '123';
 
 const PET_STAGES: PetStage[] = ['egg', 'baby', 'child', 'teen', 'adult'];
 
+// Available species for testing
+const TEST_SPECIES = [
+  { id: 'slime', name: '史萊姆', emoji: '🟢' },
+  { id: 'pixel_unicorn', name: '獨角獸', emoji: '🦄' },
+  { id: 'pixel_dragon', name: '火龍', emoji: '🐉' },
+  { id: 'pixel_ghost_cat', name: '幽靈貓', emoji: '👻' },
+  { id: 'pixel_mecha_bird', name: '機械鳥', emoji: '🤖' },
+  { id: 'pixel_crystal_rabbit', name: '水晶兔', emoji: '💎' },
+] as const;
+
 export default function TestPage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
@@ -16,6 +26,7 @@ export default function TestPage() {
 
   // Test pet states for each stage
   const [currentStage, setCurrentStage] = useState<PetStage>('egg');
+  const [currentSpecies, setCurrentSpecies] = useState<string>('pixel_unicorn');
   const [happiness, setHappiness] = useState(80);
   const [level, setLevel] = useState(1);
 
@@ -30,10 +41,13 @@ export default function TestPage() {
 
   const today = new Date().toISOString().split('T')[0];
 
+  // Get current species info
+  const speciesInfo = TEST_SPECIES.find(s => s.id === currentSpecies) || TEST_SPECIES[0];
+
   // Create a test pet state matching the current PetState interface
   const testPet: PetState = {
-    name: '測試史萊姆',
-    species: 'slime',
+    name: `測試${speciesInfo.name}`,
+    species: currentSpecies,
     stage: currentStage,
     xp: 50,
     level: level,
@@ -166,6 +180,30 @@ export default function TestPage() {
           </div>
         </div>
 
+        {/* Species Selector */}
+        <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
+          <h2 className="font-bold text-gray-700 mb-3 text-center">選擇寵物種類</h2>
+          <div className="grid grid-cols-3 gap-2">
+            {TEST_SPECIES.map((species) => (
+              <button
+                key={species.id}
+                onClick={() => setCurrentSpecies(species.id)}
+                className={`p-3 rounded-xl text-center transition-all ${
+                  currentSpecies === species.id
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                <div className="text-2xl mb-1">{species.emoji}</div>
+                <div className="text-xs font-medium">{species.name}</div>
+                {(species.id === 'pixel_unicorn' || species.id === 'pixel_dragon') && (
+                  <div className="text-[10px] text-green-500 font-bold">✨ 動畫</div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Quick Stage Selector */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
           <h2 className="font-bold text-gray-700 mb-3 text-center">快速選擇階段</h2>
@@ -246,11 +284,12 @@ export default function TestPage() {
 
         {/* All Stages Preview */}
         <div className="bg-white rounded-2xl shadow-lg p-4 mb-6">
-          <h2 className="font-bold text-gray-700 mb-3 text-center">所有階段預覽</h2>
+          <h2 className="font-bold text-gray-700 mb-3 text-center">{speciesInfo.name} 所有階段預覽</h2>
           <div className="flex flex-wrap justify-center gap-4">
             {PET_STAGES.map((stage, index) => {
               const previewPet: PetState = {
                 ...testPet,
+                species: currentSpecies,
                 stage,
                 level: 1 + index * 10,
                 name: PET_STAGE_NAMES_ZH[stage],
